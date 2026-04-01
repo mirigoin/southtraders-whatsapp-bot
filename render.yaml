@@ -1,0 +1,15 @@
+services:
+  - type: web
+      name: southtraders-whatsapp-bot
+          runtime: node
+              buildCommand: npm install
+                  startCommand: npm start
+                      envVars:
+                            - key: WHATSAPP_TOKEN
+                                    sync: false
+                                          - key: PHONE_NUMBER_ID
+                                                  sync: false
+                                                        - key: VERIFY_TOKEN
+                                                                value: southtraders_token
+                                                                      - key: PRICE_LIST_URL
+                                                                              sync: false

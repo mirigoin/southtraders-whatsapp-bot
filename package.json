@@ -1,0 +1,15 @@
+{
+    "name": "southtraders-whatsapp-bot",
+    "version": "1.0.0",
+    "description": "WhatsApp Bot para South Traders - Ventas mayoristas de iPhone en Miami",
+    "main": "index.js",
+    "scripts": {
+          "start": "node index.js"
+    },
+    "dependencies": {
+          "express": "^4.18.2",
+          "axios": "^1.6.0",
+          "dotenv": "^16.3.1",
+          "csv-parse": "^5.5.2"
+    }
+}

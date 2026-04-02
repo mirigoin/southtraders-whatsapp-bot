@@ -125,7 +125,7 @@ function getConversation(from) {
 
 function addMessage(from, role, content) {
   const conv = getConversation(from);
-  conv.push({ role, content });
+  conv.push({ role, content, ts: new Date().toISOString() });
   if (conv.length > MAX_HISTORY * 2) conv.splice(0, 2);
 }
 
@@ -207,6 +207,20 @@ app.get('/', (req, res) => res.json({
   status: 'ok',
   stock: { loaded: stockData.length > 0, items: stockData.length, lastUpdated: stockLastUpdated }
 }));
+
+// Endpoint conversaciones para dashboard
+app.get('/conversations', (req, res) => {
+  const result = {};
+  for (const [phone, msgs] of Object.entries(conversations)) {
+    result[phone] = {
+      phone,
+      messages: msgs,
+      lastActivity: msgs.length > 0 ? new Date().toISOString() : null,
+      messageCount: msgs.length
+    };
+  }
+  res.json({ ok: true, conversations: result, total: Object.keys(result).length });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('South Traders WhatsApp Bot running on port ' + PORT));

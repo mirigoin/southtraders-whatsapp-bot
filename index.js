@@ -222,8 +222,16 @@ function buildSystemPrompt() {
     '- Delivery sin cargo en area Doral para ordenes mayores a $30,000 USD\n' +
     '- Pickup en warehouse disponible para cualquier orden\n' +
     '- No hacemos envios internacionales directos\n\n' +
-    'CONDICIONES:\n' +
-    '- GA/GA+: Como nuevo | GA-: Grado A menos | GAB: A/B | GB: Grado B\n' +
+    'PRODUCTOS NUEVOS (ENFOQUE PRINCIPAL):\n' +
+    '- South Traders es DISTRIBUIDOR OFICIAL de Apple. Los iPhones SIN sufijo al final son NUEVOS, SIN ACTIVAR, directos de Apple.\n' +
+    '- Cuando un cliente pregunta por iPhones, ofrecele primero los NUEVOS. Remarca que son oficiales Apple.\n' +
+    '- Portal de stock en tiempo real para compartir al cliente: https://south-traders.pangea.ar/n6/stock_disp#\n\n' +
+    'PRODUCTOS USADOS / REFURBISHED:\n' +
+    '- Los articulos que terminan en -A, -AB, -B, -APLUS son USADOS o REFURBISHED\n' +
+    '- Si el cliente pregunta por usados/refu, mostra el stock disponible\n' +
+    '- Precios de refu: decile que se coordinan directamente, proximamente disponibles\n\n' +
+    'CONDICIONES (para usados):\n' +
+    '- GA/GA+: Como nuevo | GA-: Grado A menos | GAB: Entre A y B | GB: Grado B\n' +
     '- IND/SIM CARD: Nuevo India | USA/JP/BES ESIM: Nuevo con eSIM\n\n' +
     'ESTILO DE COMUNICACION:\n' +
     '- Siempre en el mismo idioma que el cliente (espanol o ingles)\n' +
@@ -254,7 +262,12 @@ async function askClaude(phone, userMessage) {
       { model: 'claude-haiku-4-5', max_tokens: 600, system: buildSystemPrompt(), messages },
       { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 25000 }
     );
-    const reply = response.data.content[0].text;
+    const content = response.data.content;
+    if (!content || !content.length || !content[0].text) {
+      console.error('Claude respuesta vacia:', JSON.stringify(response.data));
+      return 'Disculpa, tuve un problema tecnico. Escribinos al +1 786 909 0198.';
+    }
+    const reply = content[0].text;
     await saveMessage(phone, 'assistant', reply);
     return reply;
   } catch (err) {

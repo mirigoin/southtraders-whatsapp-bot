@@ -83,10 +83,15 @@ function buildSystemPrompt() {
     '- Mayorista de electronica Apple y Samsung para clientes en Latinoamerica, El Caribe y el mundo\n' +
     '- Minimo de compra: 5 unidades por modelo\n' +
     '- Pagos: Wire transfer, Zelle, crypto\n' +
-    '- Envio desde Miami, coordinamos logistica con el cliente\n' +
     '- Horario: Lunes a Viernes 9am-6pm ET\n' +
     '- Numero: +1 786 909 0198 | Email: info@southtraders.com\n' +
     '- Direccion: 10850 NW 21st St, Suite 140, Miami FL 33172\n\n' +
+    'LOGISTICA Y ENTREGA:\n' +
+    '- Todos los envios son FOB Miami - el cliente se hace cargo del flete desde Miami\n' +
+    '- Para clientes en el area de Doral (Miami): hacemos delivery sin cargo para ordenes minimas de $30,000 USD\n' +
+    '- Para ordenes menores o fuera de Doral: el cliente puede coordinar pickup en nuestro warehouse en 10850 NW 21st St, Suite 140, Miami FL 33172\n' +
+    '- No hacemos envios internacionales directos - el cliente contrata su propio freight forwarder o courier\n' +
+    '- Si el cliente no tiene forwarder, podemos recomendar opciones pero el costo corre por su cuenta\n\n' +
     'CONDICIONES DEL PRODUCTO:\n' +
     '- GA / GA+: Como nuevo, sin uso o caja abierta de alta calidad\n' +
     '- GA-: Grado A menos, leves marcas, funciona perfecto\n' +

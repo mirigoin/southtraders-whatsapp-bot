@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
@@ -12,6 +13,75 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const PANGEA_URL = 'https://south-traders.pangea.ar/n6/stock_disp';
 const OWNER_PHONE = process.env.OWNER_PHONE || '17865591119';
 
+// ============================================================
+// POSTGRESQL
+// ============================================================
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        phone TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        ts TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_conv_phone ON conversations(phone)');
+    console.log('DB inicializada');
+  } catch(e) {
+    console.error('Error initDB:', e.message);
+  }
+}
+
+async function loadConversation(phone) {
+  try {
+    const res = await pool.query(
+      'SELECT role, content, ts FROM conversations WHERE phone=$1 ORDER BY ts ASC LIMIT 20',
+      [phone]
+    );
+    return res.rows.map(r => ({ role: r.role, content: r.content, ts: r.ts }));
+  } catch(e) {
+    console.error('Error loadConversation:', e.message);
+    return [];
+  }
+}
+
+async function saveMessage(phone, role, content) {
+  try {
+    await pool.query(
+      'INSERT INTO conversations (phone, role, content) VALUES ($1, $2, $3)',
+      [phone, role, content]
+    );
+  } catch(e) {
+    console.error('Error saveMessage:', e.message);
+  }
+}
+
+async function getAllConversations() {
+  try {
+    const res = await pool.query(
+      'SELECT phone, role, content, ts FROM conversations ORDER BY phone, ts ASC'
+    );
+    const grouped = {};
+    for (const row of res.rows) {
+      if (!grouped[row.phone]) grouped[row.phone] = [];
+      grouped[row.phone].push({ role: row.role, content: row.content, ts: row.ts });
+    }
+    return grouped;
+  } catch(e) {
+    console.error('Error getAllConversations:', e.message);
+    return {};
+  }
+}
+
+// ============================================================
+// STOCK
+// ============================================================
 let stockData = [];
 let stockLastUpdated = null;
 
@@ -77,6 +147,9 @@ function buildStockContext() {
   return lines.join('\n');
 }
 
+// ============================================================
+// SYSTEM PROMPT
+// ============================================================
 function buildSystemPrompt() {
   const stockCtx = buildStockContext();
   return 'Sos un agente comercial de South Traders, mayorista de electronica con sede en Miami, Florida. Tu nombre es Alex.\n\n' +
@@ -89,9 +162,9 @@ function buildSystemPrompt() {
     '- Direccion: 10850 NW 21st St, Suite 140, Miami FL 33172\n\n' +
     'LOGISTICA Y ENTREGA:\n' +
     '- Todos los envios son FOB Miami - el cliente se hace cargo del flete desde Miami\n' +
-    '- Para clientes en el area de Doral (Miami): hacemos delivery sin cargo para ordenes minimas de $30,000 USD\n' +
-    '- Para ordenes menores o fuera de Doral: el cliente puede coordinar pickup en nuestro warehouse en 10850 NW 21st St, Suite 140, Miami FL 33172\n' +
-    '- No hacemos envios internacionales directos - el cliente contrata su propio freight forwarder o courier\n' +
+    '- Para clientes en el area de Doral (Miami): delivery sin cargo para ordenes minimas de $30,000 USD\n' +
+    '- Para ordenes menores o fuera de Doral: el cliente puede hacer pickup en nuestro warehouse\n' +
+    '- No hacemos envios internacionales directos - el cliente contrata su propio freight forwarder\n' +
     '- Si el cliente no tiene forwarder, podemos recomendar opciones pero el costo corre por su cuenta\n\n' +
     'CONDICIONES DEL PRODUCTO:\n' +
     '- GA / GA+: Como nuevo, sin uso o caja abierta de alta calidad\n' +
@@ -106,7 +179,7 @@ function buildSystemPrompt() {
     '- Sos directo: si hay stock lo decis, si no hay lo decis y ofrecés alternativas\n' +
     '- Nunca inventas precios ni stock que no este en el contexto\n' +
     '- Si el cliente quiere hacer un pedido, pedi: modelo, cantidad, pais de destino y datos de contacto\n' +
-    '- Usas emojis con moderacion, no en cada oracion\n' +
+    '- Usas emojis con moderacion\n' +
     '- No sos verbose: respondés lo necesario, claro y concreto\n' +
     '- Para pedidos grandes o negociaciones, invitas a llamar directo al +1 786 909 0198\n\n' +
     'PRECIOS SOUTH TRADERS (USD, minimo 5 unidades):\n' +
@@ -121,27 +194,14 @@ function buildSystemPrompt() {
     stockCtx;
 }
 
-const conversations = {};
-const MAX_HISTORY = 10;
+// ============================================================
+// CLAUDE
+// ============================================================
+async function askClaude(phone, userMessage) {
+  await saveMessage(phone, 'user', userMessage);
+  const history = await loadConversation(phone);
+  const messages = history.map(m => ({ role: m.role, content: m.content }));
 
-function getConversation(from) {
-  if (!conversations[from]) conversations[from] = [];
-  return conversations[from];
-}
-
-function addMessage(from, role, content) {
-  const conv = getConversation(from);
-  conv.push({ role, content, ts: new Date().toISOString() });
-  if (conv.length > MAX_HISTORY * 2) conv.splice(0, 2);
-}
-
-function getMessagesForClaude(from) {
-  return getConversation(from).map(m => ({ role: m.role, content: m.content }));
-}
-
-async function askClaude(from, userMessage) {
-  addMessage(from, 'user', userMessage);
-  const history = getMessagesForClaude(from);
   try {
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
@@ -149,7 +209,7 @@ async function askClaude(from, userMessage) {
         model: 'claude-haiku-4-5',
         max_tokens: 600,
         system: buildSystemPrompt(),
-        messages: history,
+        messages,
       },
       {
         headers: {
@@ -161,7 +221,7 @@ async function askClaude(from, userMessage) {
       }
     );
     const reply = response.data.content[0].text;
-    addMessage(from, 'assistant', reply);
+    await saveMessage(phone, 'assistant', reply);
     return reply;
   } catch (err) {
     console.error('Claude API error:', err.response?.data || err.message);
@@ -169,6 +229,9 @@ async function askClaude(from, userMessage) {
   }
 }
 
+// ============================================================
+// WHATSAPP
+// ============================================================
 async function sendMessage(to, text) {
   try {
     await axios.post(
@@ -181,30 +244,28 @@ async function sendMessage(to, text) {
   }
 }
 
-async function notifyOwner(from, text) {
+async function notifyOwner(phone, text) {
   try {
     const preview = text.length > 80 ? text.slice(0, 80) + '...' : text;
-    const formatted = from.startsWith('549') ? '+54 9 ' + from.slice(3) : '+' + from;
-    const notif = '🔔 Nuevo mensaje\n' +
-      'De: ' + formatted + '\n' +
-      'Dice: "' + preview + '"\n\n' +
-      'Respondé en: southtraders-whatsapp-bot.onrender.com/conversations';
+    const formatted = phone.startsWith('549') ? '+54 9 ' + phone.slice(3) : '+' + phone;
+    const notif = '🔔 Nuevo cliente\nDe: ' + formatted + '\nDice: "' + preview + '"';
     await sendMessage(OWNER_PHONE, notif);
   } catch(e) {
     console.error('Error notificacion:', e.message);
   }
 }
 
-async function handleMessage(from, text) {
-  console.log('[MSG] ' + from + ': ' + text);
-  const conv = getConversation(from);
-  if (conv.length === 0) {
-    notifyOwner(from, text);
-  }
-  const reply = await askClaude(from, text);
-  await sendMessage(from, reply);
+async function handleMessage(phone, text) {
+  console.log('[MSG] ' + phone + ': ' + text);
+  const history = await loadConversation(phone);
+  if (history.length === 0) notifyOwner(phone, text);
+  const reply = await askClaude(phone, text);
+  await sendMessage(phone, reply);
 }
 
+// ============================================================
+// WEBHOOK
+// ============================================================
 app.get('/webhook', (req, res) => {
   if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === VERIFY_TOKEN) {
     res.status(200).send(req.query['hub.challenge']);
@@ -231,24 +292,17 @@ app.post('/update-stock', (req, res) => {
   res.json({ ok: true, items: stockData.length, updated: stockLastUpdated });
 });
 
+app.get('/conversations', async (req, res) => {
+  const convs = await getAllConversations();
+  res.json({ ok: true, conversations: convs, total: Object.keys(convs).length });
+});
+
 app.get('/', (req, res) => res.json({
   status: 'ok',
   stock: { loaded: stockData.length > 0, items: stockData.length, lastUpdated: stockLastUpdated }
 }));
 
-// Endpoint conversaciones para dashboard
-app.get('/conversations', (req, res) => {
-  const result = {};
-  for (const [phone, msgs] of Object.entries(conversations)) {
-    result[phone] = {
-      phone,
-      messages: msgs,
-      lastActivity: msgs.length > 0 ? new Date().toISOString() : null,
-      messageCount: msgs.length
-    };
-  }
-  res.json({ ok: true, conversations: result, total: Object.keys(result).length });
-});
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('South Traders WhatsApp Bot running on port ' + PORT));
+initDB().then(() => {
+  app.listen(PORT, () => console.log('South Traders WhatsApp Bot running on port ' + PORT));
+});

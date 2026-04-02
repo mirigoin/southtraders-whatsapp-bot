@@ -129,9 +129,13 @@ function addMessage(from, role, content) {
   if (conv.length > MAX_HISTORY * 2) conv.splice(0, 2);
 }
 
+function getMessagesForClaude(from) {
+  return getConversation(from).map(m => ({ role: m.role, content: m.content }));
+}
+
 async function askClaude(from, userMessage) {
   addMessage(from, 'user', userMessage);
-  const history = getConversation(from);
+  const history = getMessagesForClaude(from);
   try {
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',

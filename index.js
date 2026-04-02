@@ -1,262 +1,414 @@
-require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'southtraders_token';
+// ============================================================
+// CONFIG
+// ============================================================
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-// Session storage
+// ============================================================
+// STOCK EN MEMORIA
+// Se carga via POST /update-stock desde el script local
+// ============================================================
+let stockData = [];
+let stockLastUpdated = null;
+
+const CONDITION_LABELS = {
+  'GA+':      { emoji: '⭐', label: 'GA+',      desc: 'Like new' },
+  'GA':       { emoji: '✅', label: 'GA',       desc: 'Grade A' },
+  'GA-':      { emoji: '🔵', label: 'GA-',      desc: 'Grade A-' },
+  'GAB':      { emoji: '🟡', label: 'GAB',      desc: 'Grade A/B' },
+  'GB':       { emoji: '🟠', label: 'GB',       desc: 'Grade B' },
+  'IND':      { emoji: '🆕', label: 'IND',      desc: 'India (SIM Card)' },
+  'USA ESIM': { emoji: '🇺🇸', label: 'USA eSIM', desc: 'USA eSIM' },
+  'JP ESIM':  { emoji: '🇯🇵', label: 'JP eSIM',  desc: 'Japan eSIM' },
+  'BES':      { emoji: '🌎', label: 'BES',      desc: 'BES SIM Card' },
+};
+
+function extractCondition(desc) {
+  const d = desc.toUpperCase();
+  if (d.includes('BES SIM'))                               return 'BES';
+  if (d.includes('USA ESIM') || d.includes('USA - ESIM')) return 'USA ESIM';
+  if (d.includes('JP ESIM')  || d.includes('JP- ESIM'))   return 'JP ESIM';
+  if (d.includes('IND') && d.includes('SIM'))              return 'IND';
+  if (d.includes('GA+'))                                   return 'GA+';
+  if (d.includes('- GA-') || d.includes('-GA-'))           return 'GA-';
+  if (d.includes('- GA')  || d.includes('-GA'))            return 'GA';
+  if (d.includes('GAB'))                                   return 'GAB';
+  if (d.includes('- GB')  || d.includes('-GB'))            return 'GB';
+  return 'GA';
+}
+
+function parseStockFromRows(rows) {
+  const result = [];
+  for (const row of rows) {
+    const [mfr, desc, qty, transit] = row;
+    if (!mfr || mfr === 'MFR') continue;
+    result.push({
+      mfr: String(mfr).trim(),
+      desc: String(desc || '').trim(),
+      qty: Number(qty) || 0,
+      transit: Number(transit) || 0,
+      condition: extractCondition(String(desc || '')),
+    });
+  }
+  return result;
+}
+
+function searchStock(query) {
+  if (stockData.length === 0) return null;
+  const q = query.toUpperCase();
+
+  const modelMap = [
+    { kws: ['IPHONE 17 PRO MAX'] },
+    { kws: ['IPHONE 17 PRO'] },
+    { kws: ['IPHONE 17'] },
+    { kws: ['IPHONE 16 PRO MAX'] },
+    { kws: ['IPHONE 16 PRO'] },
+    { kws: ['IPHONE 16'] },
+    { kws: ['IPHONE 15 PRO MAX'] },
+    { kws: ['IPHONE 15 PRO'] },
+    { kws: ['IPHONE 15'] },
+    { kws: ['IPHONE 14'] },
+    { kws: ['IPHONE 13'] },
+    { kws: ['S26 ULTRA'] },
+    { kws: ['S25 ULTRA'] },
+    { kws: ['SAMSUNG', 'GALAXY'] },
+    { kws: ['MACBOOK'] },
+    { kws: ['AIRPODS PRO'] },
+    { kws: ['AIRPODS'] },
+    { kws: ['IPAD'] },
+    { kws: ['APPLE WATCH', 'WATCH ULTRA'] },
+  ];
+
+  let matched = [];
+  for (const { kws } of modelMap) {
+    if (kws.some(k => q.includes(k))) {
+      matched = stockData.filter(item => kws.some(k => item.desc.toUpperCase().includes(k)));
+      break;
+    }
+  }
+
+  if (matched.length === 0) {
+    const words = q.split(/\s+/).filter(w => w.length > 2);
+    matched = stockData.filter(item => words.some(w => item.desc.toUpperCase().includes(w)));
+  }
+
+  // Filtro storage
+  const storageMatch = q.match(/(\d{2,4})\s*GB/);
+  if (storageMatch) {
+    const gb = storageMatch[1];
+    const filtered = matched.filter(item => item.desc.toUpperCase().includes(gb + 'GB'));
+    if (filtered.length > 0) matched = filtered;
+  }
+
+  // Filtro color
+  const COLORS = ['BLACK','WHITE','BLUE','SILVER','NATURAL','DESERT','STARLIGHT',
+                  'MIDNIGHT','PURPLE','RED','PINK','TEAL','YELLOW','ULTRAMARINE',
+                  'ORANGE','COSMIC ORANGE','DEEP BLUE','MIST BLUE','VIOLET','GRAY'];
+  for (const color of COLORS) {
+    if (q.includes(color)) {
+      const filtered = matched.filter(item => item.desc.toUpperCase().includes(color));
+      if (filtered.length > 0) matched = filtered;
+    }
+  }
+
+  // Filtro condicion
+  const condMap = {
+    'GA+': ['GA+'], 'GA-': ['GA-'], 'GAB': ['GAB'], ' GB': ['GB'],
+    'USA ESIM': ['USA ESIM'], 'JP ESIM': ['JP ESIM'], 'BES': ['BES'], 'IND': ['IND'],
+  };
+  for (const [keyword, conds] of Object.entries(condMap)) {
+    if (q.includes(keyword)) {
+      const filtered = matched.filter(item => conds.includes(item.condition));
+      if (filtered.length > 0) matched = filtered;
+    }
+  }
+
+  return matched;
+}
+
+function formatStockResponse(items, query) {
+  if (items === null) {
+    return '⚠️ El stock no está cargado todavía. Escribime directamente y te ayudo.';
+  }
+
+  const available = items.filter(item => item.qty > 0 || item.transit > 0);
+
+  if (available.length === 0) {
+    return '❌ *Sin stock* para ese modelo en este momento.\n\nDejame tu contacto y te aviso cuando entre 📲';
+  }
+
+  const date = stockLastUpdated
+    ? stockLastUpdated.toLocaleDateString('es-AR')
+    : new Date().toLocaleDateString('es-AR');
+
+  const lines = ['📦 *STOCK DISPONIBLE*\n'];
+  const shown = available.slice(0, 12);
+
+  for (const item of shown) {
+    const cond = CONDITION_LABELS[item.condition] || { emoji: '•', label: item.condition };
+    const stockTxt = item.qty > 0 ? item.qty + ' u' : 'Sin stock';
+    const transitTxt = item.transit > 0 ? ' _(' + item.transit + ' en tránsito)_' : '';
+    lines.push(cond.emoji + ' *' + item.desc + '*');
+    lines.push('   ' + cond.label + ' — ' + stockTxt + transitTxt + '\n');
+  }
+
+  if (available.length > 12) {
+    lines.push('_...' + (available.length - 12) + ' variantes más. Especificá color o storage para filtrar._');
+  }
+
+  lines.push('\n📅 _Stock al ' + date + '_');
+  return lines.join('\n');
+}
+
+// ============================================================
+// PRECIOS
+// ============================================================
+const PRICE_LIST = `💰 *LISTA DE PRECIOS - SOUTH TRADERS*
+
+── 📱 IPHONE 17 ──
+• iPhone Air 256GB US Specs: $850
+• iPhone 17e 256GB US Specs: $545
+• iPhone 17 256GB: $780
+• iPhone 17 Pro 256GB: $1,050
+• iPhone 17 Pro 512GB: $1,160
+• iPhone 17 Pro Max 256GB: $1,150
+• iPhone 17 Pro Max 512GB: $1,260
+• iPhone 17 Pro Max 1TB: $1,420
+
+── 📱 IPHONE 16 ──
+• iPhone 16 128GB: $640
+• iPhone 16 Pro 128GB: $850
+• iPhone 16 Pro 256GB: $960
+
+── 📱 IPHONE 15 ──
+• iPhone 15 128GB: $530
+• iPhone 15 Pro 128GB: $720
+
+── 🤖 SAMSUNG ──
+• Galaxy S25 Ultra 512GB: $1,070
+• Galaxy S26 Ultra 512GB: $1,170
+
+── 💻 MACBOOK ──
+• MacBook Air 13" M5 16GB/512GB: $1,060
+• MacBook Air 15" M4: $1,200
+
+── 🎧 ACCESORIOS ──
+• AirPods 4: $145
+• AirPods Pro 3: $210
+• Apple Watch Ultra 3: consultar
+
+_Precios en USD · Mínimo 5 unidades_`;
+
+// ============================================================
+// SESIONES
+// ============================================================
 const sessions = {};
-
-// Business info
-const BUSINESS_INFO = {
-        name: 'South Traders',
-        address: '10850 NW 21st St, Suite 140, Miami FL 33172',
-        hours: 'Monday to Friday, 9:00 AM - 5:00 PM EST',
-        type: 'Wholesale only (minimum order required)',
-        minOrder: 'Minimum 5 units per model',
-        email: 'info@southtraders.com'
-};
-
-// Price list (hardcoded)
-const PRICE_LIST = {
-        'IPHONE 17': [
-            { model: 'Apple iPhone Air 256GB US Specs', price: '$850.00' },
-            { model: 'Apple iPhone 17e 256GB US Specs', price: '$545.00' },
-            { model: 'Apple iPhone 17 256GB US/JP Specs', price: '$745.00' },
-            { model: 'Apple iPhone 17 Pro 256GB US Specs', price: '$1,170.00' },
-            { model: 'Apple iPhone 17 Pro Max 256GB US Specs', price: '$1,305.00' },
-            { model: 'Apple iPhone 17 Pro Max 512GB US/JP Specs', price: '$1,480.00' },
-            { model: 'Apple iPhone 17 Pro Max 1TB US Specs', price: '$1,680.00' },
-                ],
-        'IPHONE': [
-            { model: 'iPhone 15 128GB IND Specs', price: '$548.00' },
-            { model: 'iPhone 16 128GB IND Specs', price: '$662.00' },
-                ],
-        'SAMSUNG': [
-            { model: 'Samsung Galaxy S26 Ultra 12GB + 512GB', price: '$1,170.00' },
-            { model: 'Samsung Galaxy S25 Ultra 12GB + 512GB', price: '$895.00' },
-                ],
-        'MACBOOK': [
-            { model: 'MacBook Air 13" M5 16GB/512GB', price: '$1,060.00' },
-            { model: 'MacBook Air 15" M5 16GB/512GB', price: '$1,260.00' },
-            { model: 'MacBook Neo 13" A18 Pro 8GB/256GB', price: '$620.00' },
-            { model: 'MacBook Neo 13" A18 Pro 8GB/512GB', price: '$720.00' },
-                ],
-        'ACCESORIOS': [
-            { model: 'Apple 20W USB-C Power Adapter USA', price: '$13.50' },
-            { model: 'Apple 40W USB-C Power Adapter USA', price: '$17.50' },
-            { model: 'Apple iPad (11th Gen) A16 WiFi 128GB', price: '$307.00' },
-            { model: 'Apple Watch Ultra 3 GPS + Cellular 49mm', price: '$690.00' },
-            { model: 'AirPods Pro 3 Gen', price: '$210.00' },
-            { model: 'Apple AirPods 4', price: '$100.00' },
-                ],
-};
-
-const MODELS = ['iPhone 15', 'iPhone 16', 'iPhone 17', 'iPhone 17e', 'iPhone 17 Pro', 'iPhone 17 Pro Max'];
-
-// Webhook verification
-app.get('/webhook', (req, res) => {
-        const mode = req.query['hub.mode'];
-        const token = req.query['hub.verify_token'];
-        const challenge = req.query['hub.challenge'];
-        if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-                    console.log('Webhook verified');
-                    res.status(200).send(challenge);
-        } else {
-                    res.sendStatus(403);
-        }
-});
-
-// Receive messages
-app.post('/webhook', async (req, res) => {
-        try {
-                    const body = req.body;
-                    if (body.object === 'whatsapp_business_account') {
-                                    for (const entry of body.entry || []) {
-                                                        for (const change of entry.changes || []) {
-                                                                                const value = change.value;
-                                                                                if (value.messages) {
-                                                                                                            for (const msg of value.messages) {
-                                                                                                                                            const from = msg.from;
-                                                                                                                                            const text = msg.type === 'text' ? msg.text.body.trim() : '';
-                                                                                                                                            await handleMessage(from, text);
-                                                                                                                }
-                                                                                    }
-                                                        }
-                                    }
-                    }
-                    res.sendStatus(200);
-        } catch (err) {
-                    console.error(err);
-                    res.sendStatus(500);
-        }
-});
-
-function getPriceListText() {
-        let text = '*📋 Price List / Lista de Precios*\n';
-        text += '_Wholesale prices - Precios mayoristas_\n';
-        text += '_Min. 5 units per model / Min. 5 unidades por modelo_\n\n';
-        for (const [category, items] of Object.entries(PRICE_LIST)) {
-                    text += `*── ${category} ──*\n`;
-                    for (const item of items) {
-                                    text += `• ${item.model}: *${item.price}*\n`;
-                    }
-                    text += '\n';
-        }
-        text += '💬 To place an order reply *3* or type *ORDER*\n';
-        text += '💬 Para hacer un pedido respondé *3* o escribí *ORDEN*';
-        return text;
+function getSession(from) {
+  if (!sessions[from]) sessions[from] = { step: 'init' };
+  return sessions[from];
 }
 
+// ============================================================
+// MENSAJERIA
+// ============================================================
+async function sendMessage(to, text) {
+  try {
+    await axios.post(
+      'https://graph.facebook.com/v19.0/' + PHONE_NUMBER_ID + '/messages',
+      { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } },
+      { headers: { Authorization: 'Bearer ' + WHATSAPP_TOKEN, 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('Error enviando mensaje:', err.response?.data || err.message);
+  }
+}
+
+// ============================================================
+// MENU
+// ============================================================
+const MENU = `🏪 *SOUTH TRADERS*
+Mayorista de electrónica — Miami, FL
+
+¿En qué te puedo ayudar?
+
+1️⃣ Precios
+2️⃣ Stock disponible
+3️⃣ Modelos y especificaciones
+4️⃣ Cómo comprar / mínimos
+5️⃣ Ubicación
+6️⃣ Contacto directo
+
+_Respondé con el número de opción o preguntame directamente_`;
+
+const HOW_TO_BUY = `🛒 *CÓMO COMPRAR*
+
+📦 *Mínimo:* 5 unidades por modelo
+💵 *Pago:* Wire transfer / Zelle / Crypto
+🚚 *Envío:* Desde Miami — coordinamos logística
+✅ *Garantía:* Según condición del equipo
+
+Para hacer un pedido, decime:
+• Modelo
+• Cantidad
+• Destino de envío`;
+
+const LOCATION = `📍 *SOUTH TRADERS*
+10850 NW 21st St, Suite 140
+Miami, FL 33172, USA
+
+🕐 Lunes a Viernes: 9am – 6pm ET
+📞 +1 786 909 0198`;
+
+// ============================================================
+// PROCESAMIENTO
+// ============================================================
 async function handleMessage(from, text) {
-        if (!sessions[from]) sessions[from] = { step: 'menu' };
-        const session = sessions[from];
-        const lower = text.toLowerCase();
+  const msg = text.trim().toLowerCase();
 
-    // Greeting triggers - only show menu for greetings, not for every message
-    const isGreeting = ['hola', 'hello', 'hi', 'buenas', 'hey', 'start', 'menu', 'inicio'].some(w => lower === w || lower.startsWith(w));
-        if (isGreeting) {
-                    sessions[from] = { step: 'menu' };
-                    await sendMessage(from, getMainMenu());
-                    return;
-        }
+  // Saludos
+  const greetings = ['hola','hello','hi','hey','buenos dias','buenas','good morning','start','inicio','menu'];
+  if (greetings.some(g => msg === g || msg.startsWith(g + ' '))) {
+    await sendMessage(from, MENU);
+    return;
+  }
 
-    // Order flow takes priority when in order steps
-    if (session.step === 'order_model') {
-                const modelIndex = parseInt(lower) - 1;
-                let selectedModel = null;
-                if (modelIndex >= 0 && modelIndex < MODELS.length) {
-                                selectedModel = MODELS[modelIndex];
-                } else {
-                                selectedModel = MODELS.find(m => lower.includes(m.toLowerCase()));
-                }
-                if (selectedModel) {
-                                sessions[from] = { step: 'order_quantity', model: selectedModel };
-                                await sendMessage(from, `Great choice! / ¡Buena elección!\n\n📱 *${selectedModel}*\n\nHow many units do you need?\n¿Cuántas unidades necesitás?\n\n⚠️ Minimum order is 5 units.\nEl pedido mínimo es 5 unidades.\n\nPlease enter a quantity of 5 or more:`);
-                } else {
-                                await sendMessage(from, `I didn't recognize that model. Please choose from the list:\nNo reconocí ese modelo. Por favor elegí de la lista:\n\n${MODELS.map((m, i) => `${i + 1}. ${m}`).join('\n')}`);
-                }
-                return;
+  // Opcion 1 - Precios
+  if (msg === '1' || msg.includes('precio') || msg.includes('price') || msg.includes('lista')) {
+    await sendMessage(from, PRICE_LIST);
+    return;
+  }
+
+  // Opcion 2 - Stock general
+  if (msg === '2' || msg === 'stock' || msg === 'disponible') {
+    if (stockData.length === 0) {
+      await sendMessage(from, '📦 El stock se actualiza diariamente.\nEscribime qué modelo buscás y te confirmo disponibilidad 👍');
+    } else {
+      await sendMessage(from, '📦 *STOCK*\n\n¿Qué modelo buscás? Ejemplos:\n\n• _"stock iphone 17 pro max"_\n• _"hay samsung s26 ultra"_\n• _"macbook m5"_\n\nPreguntame directamente 👇');
     }
+    return;
+  }
 
-    if (session.step === 'order_quantity') {
-                const qty = parseInt(text);
-                if (qty >= 5) {
-                                sessions[from] = { step: 'order_color', model: session.model, quantity: qty };
-                                await sendMessage(from, `Perfect! ${qty} units of ${session.model}\n\nWhat color(s) do you prefer?\nPerfecto! ${qty} unidades de ${session.model}\n\n¿Qué color/es preferís?\n\n🎨 Available colors / Colores disponibles:\nBlack, White, Blue, Natural Titanium, Desert Titanium, White Titanium, Black Titanium`);
-                } else {
-                                await sendMessage(from, `Minimum order is 5 units.\nEl pedido mínimo es 5 unidades.\n\nPlease enter a quantity of 5 or more:`);
-                }
-                return;
+  // Busqueda de stock por modelo (deteccion automatica)
+  const stockKeywords = ['iphone','samsung','galaxy','macbook','airpods','ipad','apple watch','s26','s25','i17','i16','i15','i14'];
+  const isStockQuery = stockKeywords.some(k => msg.includes(k));
+
+  if (isStockQuery) {
+    if (stockData.length === 0) {
+      await sendMessage(from, '📦 Consultame directamente por disponibilidad, actualizamos el stock a diario.');
+    } else {
+      const results = searchStock(msg);
+      await sendMessage(from, formatStockResponse(results, text));
     }
+    return;
+  }
 
-    if (session.step === 'order_color') {
-                sessions[from] = { step: 'order_confirm', model: session.model, quantity: session.quantity, color: text };
-                await sendMessage(from, `*📋 Order Summary / Resumen del Pedido:*\n\n📱 Model: ${session.model}\n📦 Quantity: ${session.quantity} units\n🎨 Color: ${text}\n\nTo confirm your order, please reply *CONFIRM*\nTo cancel, reply *CANCEL*\n\nPara confirmar tu pedido respondé *CONFIRMAR*\nPara cancelar respondé *CANCELAR*`);
-                return;
-    }
+  // Opcion 3 - Modelos
+  if (msg === '3' || msg.includes('modelo') || msg.includes('spec')) {
+    await sendMessage(from, `📱 *MODELOS DISPONIBLES*
 
-    if (session.step === 'order_confirm') {
-                if (['confirm', 'confirmar', 'yes', 'si', 'sí'].some(w => lower === w)) {
-                                await sendMessage(from, `✅ *Order Received! / ¡Pedido Recibido!*\n\n📱 ${session.model} x${session.quantity} - ${session.color}\n\nOur team will contact you shortly to finalize pricing and payment details.\nNuestro equipo se comunicará con vos pronto para finalizar el precio y los detalles de pago.\n\n📍 Warehouse: ${BUSINESS_INFO.address}\n🕐 Hours: ${BUSINESS_INFO.hours}`);
-                                sessions[from] = { step: 'menu' };
-                } else if (['cancel', 'cancelar', 'no'].some(w => lower === w)) {
-                                sessions[from] = { step: 'menu' };
-                                await sendMessage(from, `Order cancelled. / Pedido cancelado.\n\n${getMainMenu()}`);
-                } else {
-                                await sendMessage(from, `Please reply CONFIRM to confirm or CANCEL to cancel.\nPor favor respondé CONFIRMAR para confirmar o CANCELAR para cancelar.`);
-                }
-                return;
-    }
+*iPhone 17 Series* (2025)
+• Air · 17e · 17 · 17 Pro · 17 Pro Max
 
-    // Menu options (work from any state including 'menu')
-    // Prices
-    if (['1', 'precio', 'precios', 'price', 'prices', 'lista', 'list'].some(w => lower === w || lower.includes(w))) {
-                await sendMessage(from, getPriceListText());
-                return;
-    }
+*iPhone 16 Series*
+• 16 · 16 Plus · 16 Pro · 16 Pro Max
 
-    // Models / Specs
-    if (['2', 'modelo', 'modelos', 'spec', 'specs', 'especificaciones'].some(w => lower === w || lower.includes(w))) {
-                await sendMessage(from, getModelsInfo());
-                return;
-    }
+*iPhone 15 Series*
+• 15 · 15 Plus · 15 Pro · 15 Pro Max
 
-    // Place order
-    if (['3', 'orden', 'order', 'pedido', 'comprar', 'buy'].some(w => lower === w || lower.includes(w))) {
-                sessions[from] = { step: 'order_model' };
-                await sendMessage(from, `*🛒 Place an Order / Hacer un Pedido*\n\nWhich model are you interested in?\n¿Qué modelo te interesa?\n\n${MODELS.map((m, i) => `${i + 1}. ${m}`).join('\n')}\n\nReply with the model name or number.\nRespondé con el nombre o número del modelo.`);
-                return;
-    }
+*Samsung Galaxy*
+• S25 Ultra · S26 Ultra (2025)
 
-    // Inventory
-    if (['4', 'inventario', 'inventory', 'stock', 'disponible', 'available'].some(w => lower === w || lower.includes(w))) {
-                await sendMessage(from, getInventoryInfo());
-                return;
-    }
+*MacBook*
+• Air 13" M5 · Air 15" M4
 
-    // Location
-    if (['5', 'ubicacion', 'ubicación', 'location', 'address', 'dirección', 'direccion', 'warehouse', 'miami'].some(w => lower === w || lower.includes(w))) {
-                await sendMessage(from, getLocationInfo());
-                return;
-    }
+*Accesorios*
+• AirPods 4 · AirPods Pro 3 · Apple Watch Ultra 3`);
+    return;
+  }
 
-    // FAQ
-    if (['6', 'faq', 'preguntas', 'questions', 'info', 'informacion', 'información'].some(w => lower === w || lower.includes(w))) {
-                await sendMessage(from, getFAQ());
-                return;
-    }
+  // Opcion 4 - Como comprar
+  if (msg === '4' || msg.includes('comprar') || msg.includes('pedido') || msg.includes('minimo')) {
+    await sendMessage(from, HOW_TO_BUY);
+    return;
+  }
 
-    // Default - show menu
-    await sendMessage(from, `I didn't understand that. Here's the main menu:\nNo entendí eso. Aquí está el menú principal:\n\n${getMainMenu()}`);
+  // Opcion 5 - Ubicacion
+  if (msg === '5' || msg.includes('ubicacion') || msg.includes('direccion') || msg.includes('address')) {
+    await sendMessage(from, LOCATION);
+    return;
+  }
+
+  // Opcion 6 - Contacto
+  if (msg === '6' || msg.includes('contacto') || msg.includes('hablar') || msg.includes('asesor')) {
+    await sendMessage(from, '📲 *CONTACTO DIRECTO*\n\nWhatsApp: +1 786 909 0198\nEmail: info@southtraders.com\n\nPara pedidos grandes, comunicate directamente con nuestro equipo.');
+    return;
+  }
+
+  // Fallback
+  await sendMessage(from, '🤔 No entendí bien.\n\nPodés preguntar por:\n• _"stock iphone 17 pro max"_\n• _"precio samsung s26"_\n\nO escribí *menu* para ver todas las opciones.');
 }
 
-function getMainMenu() {
-        return `👋 *Welcome to South Traders! / ¡Bienvenido a South Traders!*\n_Wholesale iPhones & Tech - Miami_\n\nHow can we help you?\n¿En qué podemos ayudarte?\n\n1️⃣ Price List / Lista de Precios\n2️⃣ Models & Specs / Modelos y Especificaciones\n3️⃣ Place an Order / Hacer un Pedido\n4️⃣ Inventory / Inventario\n5️⃣ Location & Hours / Ubicación y Horarios\n6️⃣ FAQ / Preguntas Frecuentes\n\nReply with a number or keyword.\nRespondé con un número o palabra clave.`;
-}
+// ============================================================
+// WEBHOOK
+// ============================================================
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('Webhook verificado');
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
 
-function getModelsInfo() {
-        return `📱 *Models & Specs / Modelos y Especificaciones*\n\nCurrently stocking / Actualmente en stock:\n${MODELS.map(m => `• ${m}`).join('\n')}\n\n🔓 For real-time availability and quantities, contact our sales team or visit our warehouse.\nPara disponibilidad en tiempo real, contactá a nuestro equipo de ventas o visitá el warehouse.\n\n📍 ${BUSINESS_INFO.address}\n🕐 ${BUSINESS_INFO.hours}\n\n⚠️ *Wholesale only - Minimum 5 units per model*\n*Solo mayorista - Mínimo 5 unidades por modelo*`;
-}
+app.post('/webhook', async (req, res) => {
+  res.sendStatus(200);
+  const messages = req.body?.entry?.[0]?.changes?.[0]?.value?.messages;
+  if (!messages || messages.length === 0) return;
+  const message = messages[0];
+  if (message.type === 'text') {
+    console.log('[MSG] ' + message.from + ': ' + message.text?.body);
+    await handleMessage(message.from, message.text?.body || '');
+  }
+});
 
-function getInventoryInfo() {
-        return `📦 *Inventory / Inventario*\n\nWe maintain live inventory updated daily.\nMantenemos inventario actualizado diariamente.\n\n✅ *Currently stocking / Actualmente en stock:*\n${MODELS.map(m => `• ${m}`).join('\n')}\n\n🔎 For real-time availability and quantities, contact our sales team or visit our warehouse.\nPara disponibilidad en tiempo real, contactá a nuestro equipo de ventas o visitá el warehouse.\n\n📍 ${BUSINESS_INFO.address}\n🕐 ${BUSINESS_INFO.hours}\n\n⚠️ *Wholesale only - Minimum 5 units per model*\n*Solo mayorista - Mínimo 5 unidades por modelo*`;
-}
+// ============================================================
+// ENDPOINT ACTUALIZAR STOCK
+// POST /update-stock  body: { rows: [[mfr, desc, qty, transit], ...] }
+// ============================================================
+app.post('/update-stock', (req, res) => {
+  const secret = req.headers['x-secret'];
+  if (process.env.UPDATE_SECRET && secret !== process.env.UPDATE_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { rows } = req.body;
+  if (!rows || !Array.isArray(rows)) {
+    return res.status(400).json({ error: 'rows array required' });
+  }
+  stockData = parseStockFromRows(rows);
+  stockLastUpdated = new Date();
+  console.log('Stock actualizado: ' + stockData.length + ' items');
+  res.json({ ok: true, items: stockData.length, updated: stockLastUpdated });
+});
 
-function getLocationInfo() {
-        return `📍 *Location & Hours / Ubicación y Horarios*\n\n🏢 *South Traders Warehouse*\n${BUSINESS_INFO.address}\n\n🕐 *Hours / Horarios:*\n${BUSINESS_INFO.hours}\n\n🚗 *We are located in the Doral/Miami area*\n*Estamos ubicados en el área de Doral/Miami*\n\n✅ Walk-ins welcome during business hours\n✅ Se aceptan visitas durante el horario de atención\n\n🛒 *Wholesale buyers only*\n*Solo compradores mayoristas*`;
-}
-
-function getFAQ() {
-        return `❓ *FAQ / Preguntas Frecuentes*\n\n*Q: Do you sell retail? / ¿Venden al por menor?*\nA: No, wholesale only. Min 5 units. / No, solo mayorista. Mín 5 unidades.\n\n*Q: Are phones unlocked? / ¿Los teléfonos están desbloqueados?*\nA: Yes, all units are factory unlocked. / Sí, todas las unidades están desbloqueadas de fábrica.\n\n*Q: Do you ship? / ¿Hacen envíos?*\nA: Yes, domestic & international. / Sí, nacional e internacional.\n\n*Q: What payment methods? / ¿Qué métodos de pago?*\nA: Wire transfer, Zelle, Cash. / Transferencia bancaria, Zelle, Efectivo.\n\n*Q: Are prices negotiable? / ¿Los precios son negociables?*\nA: For large orders, yes. / Para pedidos grandes, sí.\n\n*Q: Location? / ¿Dónde están?*\nA: ${BUSINESS_INFO.address}\n\nMore questions? Reply with your question!\n¿Más preguntas? ¡Respondé con tu pregunta!`;
-}
-
-async function sendMessage(to, message) {
-        try {
-                    await axios.post(
-                                    `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-                        {
-                                            messaging_product: 'whatsapp',
-                                            to,
-                                            type: 'text',
-                                            text: { body: message }
-                        },
-                        {
-                                            headers: {
-                                                                    Authorization: `Bearer ${WHATSAPP_TOKEN}`,
-                                                                    'Content-Type': 'application/json'
-                                            }
-                        }
-                                );
-        } catch (err) {
-                    console.error('Error sending message:', err.response?.data || err.message);
-        }
-}
+// Health check
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'South Traders WhatsApp Bot',
+    stock: { loaded: stockData.length > 0, items: stockData.length, lastUpdated: stockLastUpdated }
+  });
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`South Traders WhatsApp Bot running on port ${PORT}`));
+app.listen(PORT, () => console.log('South Traders WhatsApp Bot running on port ' + PORT));

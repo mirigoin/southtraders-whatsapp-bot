@@ -10,6 +10,7 @@ const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const PANGEA_URL = 'https://south-traders.pangea.ar/n6/stock_disp';
+const OWNER_PHONE = process.env.OWNER_PHONE || '17865591119';
 
 let stockData = [];
 let stockLastUpdated = null;
@@ -180,8 +181,26 @@ async function sendMessage(to, text) {
   }
 }
 
+async function notifyOwner(from, text) {
+  try {
+    const preview = text.length > 80 ? text.slice(0, 80) + '...' : text;
+    const formatted = from.startsWith('549') ? '+54 9 ' + from.slice(3) : '+' + from;
+    const notif = '🔔 Nuevo mensaje\n' +
+      'De: ' + formatted + '\n' +
+      'Dice: "' + preview + '"\n\n' +
+      'Respondé en: southtraders-whatsapp-bot.onrender.com/conversations';
+    await sendMessage(OWNER_PHONE, notif);
+  } catch(e) {
+    console.error('Error notificacion:', e.message);
+  }
+}
+
 async function handleMessage(from, text) {
   console.log('[MSG] ' + from + ': ' + text);
+  const conv = getConversation(from);
+  if (conv.length === 0) {
+    notifyOwner(from, text);
+  }
   const reply = await askClaude(from, text);
   await sendMessage(from, reply);
 }

@@ -11,8 +11,7 @@ body{background:#f5f5f5;padding:16px;color:#111}
 h1{font-size:18px;font-weight:600}
 .badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#d1fae5;color:#065f46;font-weight:500}
 .badge.off{background:#fee2e2;color:#991b1b}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.stat{background:#fff;border-radius:10px;padding:12px;border:1px solid #e5e5e5}
+fix: agregar boton pausar en HTML del dashboard.stat{background:#fff;border-radius:10px;padding:12px;border:1px solid #e5e5e5}
 .stat-lbl{font-size:11px;color:#888;margin-bottom:4px}
 .stat-val{font-size:22px;font-weight:600}
 .layout{display:grid;grid-template-columns:220px 1fr;gap:10px}
@@ -64,7 +63,10 @@ h1{font-size:18px;font-weight:600}
   <div class="chat">
     <div class="cht">
       <span id="ct">Selecciona un contacto</span>
-      <button class="clr" id="clrbtn" style="display:none" onclick="clrHist()">Borrar historial</button>
+      <div style="display:flex;gap:6px">
+        <button class="pause-btn active" id="pausebtn" style="display:none" onclick="togglePause()">&#9646;&#9646; Pausar Sophia</button>
+        <button class="clr" id="clrbtn" style="display:none" onclick="clrHist()">Borrar historial</button>
+      </div>
     </div>
     <div class="cb" id="cb"><div class="empty">Elige un contacto</div></div>
   </div>

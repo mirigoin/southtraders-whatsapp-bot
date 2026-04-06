@@ -19,6 +19,7 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL ? { re
 async function initDB() {
   await pool.query('CREATE TABLE IF NOT EXISTS conversations (phone TEXT, role TEXT, content TEXT, ts TIMESTAMPTZ DEFAULT NOW())');
   await pool.query('CREATE TABLE IF NOT EXISTS crm_contacts (id SERIAL PRIMARY KEY, phone TEXT UNIQUE, name TEXT, country TEXT, company TEXT, interest TEXT, tier TEXT DEFAULT \'lead\', status TEXT DEFAULT \'new\', notes TEXT, last_contact TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW())');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE');
   await pool.query('CREATE TABLE IF NOT EXISTS outbound_campaigns (id SERIAL PRIMARY KEY, name TEXT, message TEXT, status TEXT DEFAULT \'pending\', created_at TIMESTAMPTZ DEFAULT NOW(), total_sent INT DEFAULT 0, total_failed INT DEFAULT 0)');
   await pool.query('CREATE TABLE IF NOT EXISTS outbound_logs (id SERIAL PRIMARY KEY, campaign_id INT, phone TEXT, status TEXT DEFAULT \'pending\', sent_at TIMESTAMPTZ, error TEXT)');
   console.log('DB OK');
@@ -154,6 +155,14 @@ async function sendWA(to, text) {
 async function handleMessage(phone, text) {
   console.log('[IN] ' + phone + ': ' + text);
   await upsertContact(phone);
+  // Chequear si el contacto está pausado (Chelo toma el control)
+  try {
+    const pauseCheck = await pool.query('SELECT paused FROM crm_contacts WHERE phone=$1', [phone]);
+    if (pauseCheck.rows.length > 0 && pauseCheck.rows[0].paused) {
+      console.log('[PAUSED] ' + phone + ' - Sophia en pausa, Chelo maneja');
+      return;
+    }
+  } catch(e) {}
   const history = await loadConversation(phone);
   if (history.length === 0) {
     sendWA(OWNER_PHONE, '\uD83D\uDD14 Nuevo mensaje\nDe: +' + phone + '\n"' + text.slice(0,80) + '"').catch(function(){});
@@ -265,6 +274,16 @@ app.get('/privacy', function(req, res) { res.send('<h1>Privacy Policy</h1><p>Sou
 app.get('/terms', function(req, res) { res.send('<h1>Terms of Service</h1><p>By messaging this bot you agree to receive wholesale electronics information. Min order 5 units. Contact: info@southtraders.com</p>'); });
 
 // HEALTH
+app.post('/crm/pause', async function(req, res) {
+  const { phone, paused } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone required' });
+  try {
+    await pool.query('UPDATE crm_contacts SET paused=$1 WHERE phone=$2', [paused, phone]);
+    res.json({ ok: true, phone, paused });
+    console.log('[' + (paused ? 'PAUSED' : 'RESUMED') + '] ' + phone);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/', function(req, res) { res.json({ status: 'ok', stock: { items: stockData.length, updated: stockLastUpdated } }); });
 
 const PORT = process.env.PORT || 3000;

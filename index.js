@@ -192,6 +192,16 @@ app.post('/webhook', function(req, res) {
 });
 
 // DASHBOARD
+app.post('/send', async function(req, res) {
+  const b = req.body;
+  if (!b.phone || !b.message) return res.status(400).json({error: 'faltan datos'});
+  try {
+    await sendWA(b.phone, b.message);
+    await saveMessage(b.phone, 'assistant', '[Chelo] ' + b.message);
+    res.json({ok: true});
+  } catch(e) { res.status(500).json({error: e.message}); }
+});
+
 app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
 });

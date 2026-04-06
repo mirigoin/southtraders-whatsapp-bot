@@ -38,6 +38,9 @@ h1{font-size:18px;font-weight:600}
 .empty{display:flex;align-items:center;justify-content:center;height:200px;color:#bbb;font-size:13px}
 .btn{font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff}
 .clr{font-size:11px;padding:3px 8px;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;background:#fff;color:#dc2626}
+.pause-btn{font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;font-weight:500;border:none}
+.pause-btn.active{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.pause-btn.paused{background:#dcfce7;color:#166534;border:1px solid #86efac}
 </style>
 </head>
 <body>
@@ -137,6 +140,33 @@ async function clrHist() {
     await load();
     document.getElementById('cb').innerHTML = '<div class="empty">Historial borrado</div>';
   } catch(e) { alert('Error al borrar'); }
+}
+
+let isPaused = false;
+
+async function togglePause() {
+  if (!sel) return;
+  isPaused = !isPaused;
+  try {
+    await fetch(BOT + '/crm/pause', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({phone: sel, paused: isPaused})
+    });
+    updatePauseBtn();
+  } catch(e) { alert('Error al pausar'); isPaused = !isPaused; }
+}
+
+function updatePauseBtn() {
+  const btn = document.getElementById('pausebtn');
+  if (!btn) return;
+  if (isPaused) {
+    btn.textContent = '▶ Reanudar Sophia';
+    btn.className = 'pause-btn paused';
+  } else {
+    btn.textContent = '⏸ Pausar Sophia';
+    btn.className = 'pause-btn active';
+  }
 }
 
 async function load() {

@@ -265,5 +265,90 @@ app.get('/terms', (req, res) => res.send('<h1>Terms of Service</h1><p>By messagi
 // HEALTH
 app.get('/', (req, res) => res.json({ status: 'ok', stock: { items: stockData.length, updated: stockLastUpdated } }));
 
+app.get('/dashboard', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sophia Dashboard - South Traders</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
+body{background:#f5f5f5;color:#111;padding:16px}
+h1{font-size:18px;font-weight:600;margin-bottom:16px;color:#111}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:10px;padding:12px;border:1px solid #e5e5e5}
+.stat-lbl{font-size:11px;color:#888;margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:600}
+.layout{display:grid;grid-template-columns:220px 1fr;gap:10px}
+.sidebar{background:#fff;border-radius:10px;border:1px solid #e5e5e5;overflow-y:auto;max-height:500px}
+.sidebar-hdr{padding:8px 12px;font-size:11px;color:#888;border-bottom:1px solid #eee;text-transform:uppercase;letter-spacing:.05em;background:#fafafa}
+.contact{padding:10px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0}
+.contact:hover{background:#f5f5f5}
+.contact.active{background:#e8f0fe}
+.contact-phone{font-size:13px;font-weight:600;margin-bottom:2px}
+.contact-preview{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contact-time{font-size:10px;color:#bbb;margin-top:2px}
+.chat{background:#fff;border-radius:10px;border:1px solid #e5e5e5;display:flex;flex-direction:column}
+.chat-hdr{padding:10px 14px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;background:#fafafa;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center}
+.chat-body{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:350px;max-height:450px}
+.msg-wrap{display:flex;flex-direction:column}
+.msg-wrap.user{align-items:flex-end}
+.msg-wrap.assistant{align-items:flex-start}
+.msg{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap}
+.msg.user{background:#e8f0fe;color:#1a56c4;border-bottom-right-radius:3px}
+.msg.assistant{background:#f0f0f0;color:#111;border-bottom-left-radius:3px}
+.msg-time{font-size:10px;color:#bbb;margin-top:2px;padding:0 2px}
+.empty{display:flex;align-items:center;justify-content:center;height:200px;color:#bbb;font-size:13px}
+.badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:10px;background:#d1fae5;color:#065f46;font-weight:500}
+.badge.off{background:#fee2e2;color:#991b1b}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.refresh-btn{font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff}
+.clear-btn{font-size:11px;padding:3px 8px;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;background:#fff;color:#dc2626}
+@media(max-width:600px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>Sophia — South Traders</h1>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="badge" class="badge off">conectando...</span>
+    <button class="refresh-btn" onclick="load()">Actualizar</button>
+  </div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-lbl">Conversaciones</div><div class="stat-val" id="s-total">—</div></div>
+  <div class="stat"><div class="stat-lbl">Mensajes totales</div><div class="stat-val" id="s-msgs">—</div></div>
+  <div class="stat"><div class="stat-lbl">Actualizado</div><div class="stat-val" style="font-size:13px;padding-top:5px" id="s-time">—</div></div>
+</div>
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-hdr">Contactos</div>
+    <div id="contacts"></div>
+  </div>
+  <div class="chat">
+    <div class="chat-hdr">
+      <span id="chat-title">Seleccioná un contacto</span>
+      <button class="clear-btn" id="clear-btn" style="display:none" onclick="clearHistory()">Borrar historial</button>
+    </div>
+    <div class="chat-body" id="chat-body"><div class="empty">Elegí un contacto</div></div>
+  </div>
+</div>
+<script>
+const BOT='';
+let convs={},selected=null;
+function fmt(p){if(p.startsWith('549'))return'+54 9 '+p.slice(3,5)+' '+p.slice(5,9)+'-'+p.slice(9);if(p.startsWith('1')&&p.length===11)return'+1 ('+p.slice(1,4)+') '+p.slice(4,7)+'-'+p.slice(7);return'+'+p;}
+function ft(ts){if(!ts)return'';try{return new Date(ts).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}}
+function fd(ts){if(!ts)return'';try{const d=new Date(ts);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}}
+function renderContacts(){const phones=Object.keys(convs).sort((a,b)=>{const al=convs[a].messages?.slice(-1)[0]?.ts||'';const bl=convs[b].messages?.slice(-1)[0]?.ts||'';return bl.localeCompare(al);});const el=document.getElementById('contacts');if(!phones.length){el.innerHTML='<div class="empty" style="height:80px;font-size:12px">Sin conversaciones</div>';return;}el.innerHTML=phones.map(p=>{const msgs=convs[p].messages||[];const last=msgs[msgs.length-1];const preview=last?last.content.slice(0,40)+'...':'';return `<div class="contact ${p===selected?'active':''}" onclick="selectContact('${p}')"><div class="contact-phone">${fmt(p)}</div><div class="contact-preview">${preview}</div><div class="contact-time">${msgs.length} msgs · ${last?fd(last.ts):''}</div></div>`;}).join('');}
+function selectContact(phone){selected=phone;renderContacts();const msgs=(convs[phone]&&convs[phone].messages)||[];document.getElementById('chat-title').textContent=fmt(phone)+' — '+msgs.length+' mensajes';document.getElementById('clear-btn').style.display='block';const body=document.getElementById('chat-body');if(!msgs.length){body.innerHTML='<div class="empty">Sin mensajes</div>';return;}body.innerHTML=msgs.map(m=>`<div class="msg-wrap ${m.role}"><div class="msg ${m.role}">${m.content.replace(/</g,'&lt;')}</div><div class="msg-time">${m.role==='assistant'?'Sophia · ':''}${ft(m.ts)}</div></div>`).join('');body.scrollTop=body.scrollHeight;}
+async function clearHistory(){if(!selected)return;if(!confirm('¿Borrar historial de '+fmt(selected)+'?'))return;try{await fetch(BOT+'/conversations/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:selected})});await load();document.getElementById('chat-body').innerHTML='<div class="empty">Historial borrado</div>';}catch(e){alert('Error al borrar');}}
+async function load(){const badge=document.getElementById('badge');try{const r=await fetch(BOT+'/conversations');const data=await r.json();convs=data.conversations||{};const phones=Object.keys(convs);const totalMsgs=phones.reduce((s,p)=>s+(convs[p].messages||[]).length,0);document.getElementById('s-total').textContent=phones.length;document.getElementById('s-msgs').textContent=totalMsgs;document.getElementById('s-time').textContent=new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});badge.textContent='en vivo';badge.className='badge';renderContacts();if(selected&&convs[selected])selectContact(selected);else if(phones.length&&!selected)selectContact(phones[0]);}catch(e){badge.textContent='sin conexión';badge.className='badge off';}}
+load();setInterval(load,10000);
+</script>
+</body>
+</html>`);
+});
+
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log('Sophia online port ' + PORT))).catch(console.error);

@@ -100,7 +100,7 @@ function rc() {
     const last = msgs[msgs.length-1];
     const preview = last ? last.content.substring(0,40) + '...' : '';
     const active = p === sel ? ' active' : '';
-    return '<div class="contact' + active + '" onclick="sc('' + p + '')">' +
+    return '<div class="contact' + active + '" data-ph="' + p + '" onclick="sc(this.getAttribute(\x27data-ph\x27))">' +
       '<div class="cp">' + fmt(p) + '</div>' +
       '<div class="cv">' + preview + '</div>' +
       '<div class="ct">' + msgs.length + ' msgs - ' + (last ? fd(last.ts) : '') + '</div>' +

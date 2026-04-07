@@ -20,6 +20,159 @@ async function initDB() {
   await pool.query('CREATE TABLE IF NOT EXISTS conversations (phone TEXT, role TEXT, content TEXT, ts TIMESTAMPTZ DEFAULT NOW())');
   await pool.query('CREATE TABLE IF NOT EXISTS crm_contacts (id SERIAL PRIMARY KEY, phone TEXT UNIQUE, name TEXT, country TEXT, company TEXT, interest TEXT, tier TEXT DEFAULT \'lead\', status TEXT DEFAULT \'new\', notes TEXT, last_contact TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW())');
   await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT \'tier1\'');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS registered BOOLEAN DEFAULT FALSE');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS logistics TEXT');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS pending_order BOOLEAN DEFAULT FALSE');
+  await pool.query('CREATE TABLE IF NOT EXISTS outbound_campaigns (id SERIAL PRIMARY KEY, name TEXT, message TEXT, status TEXT DEFAULT \'pending\', created_at TIMESTAMPTZ DEFAULT NOW(), total_sent INT DEFAULT 0, total_failed INT DEFAULT 0)');
+  await pool.query('CREATE TABLE IF NOT EXISTS outbound_logs (id SERIAL PRIMARY KEY, campaign_id INT, phone TEXT, status TEXT DEFAULT \'pending\', sent_at TIMESTAMPTZ, error TEXT)');
+  console.log('DB OK');
+}
+
+async function loadConversation(phone) {
+  try {
+    const r = await pool.query('SELECT role, content, ts FROM conversations WHERE phone=$1 ORDER BY ts DESC LIMIT 10', [phone]);
+    return r.rows.reverse();
+  } catch(e) { return []; }
+}
+
+async function saveMessage(phone, role, content) {
+  try { await pool.query('INSERT INTO conversations (phone, role, content) VALUES ($1,$2,$3)', [phone, role, content]); } catch(e) {}
+}
+
+async function upsertContact(phone) {
+  try {
+    const country = detectCountry(phone);
+    await pool.query(
+      'INSERT INTO crm_contacts (phone, country) VALUES ($1, $2) ON CONFLICT (phone) DO UPDATE SET last_contact=NOW()',
+      [phone, country]
+    );
+  } catch(e) {}
+}
+
+// STOCK
+let stockData = [];
+let stockLastUpdated = null;
+
+async function fetchStock() {
+  try {
+    const resp = await axios.get('https://south-traders.pangea.ar/n6/stock_disp', { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const rows = [];
+    const trRe = /<tr[^>]*>([sS]*?)<\/tr>/gi;
+    let tr;
+    while ((tr = trRe.exec(resp.data)) !== null) {
+      const cells = [];
+      const tdRe = /<td[^>]*>([sS]*?)<\/td>/gi;
+      let td;
+      while ((td = tdRe.exec(tr[1])) !== null) cells.push(td[1].replace(/<[^>]+>/g,'').trim());
+      if (cells.length >= 3 && cells[0] && cells[1]) rows.push({ desc: cells[1], qty: parseInt(cells[2])||0, transit: parseInt(cells[3])||0 });
+    }
+    if (rows.length > 0) { stockData = rows; stockLastUpdated = new Date(); console.log('Stock OK: ' + rows.length); }
+  } catch(e) { console.error('Stock error:', e.message); }
+}
+
+fetchStock();
+setInterval(fetchStock, 6 * 3600 * 1000);
+
+function getStockSummary() {
+  if (!stockData.length) return 'Stock actualizandose.';
+  const nuevos = stockData.filter(function(i) { return i.qty > 0 && !/\s[-]\s*(GA\+?-?|GAB|GB|IND)$/i.test(i.desc); });
+  const grupos = {};
+  for (let i = 0; i < nuevos.length; i++) {
+    const item = nuevos[i];
+    const base = item.desc.replace(/\s+(BLACK|BLUE|PINK|WHITE|GREEN|YELLOW|RED|PURPLE|SILVER|GOLD|STARLIGHT|MIDNIGHT|NATURAL|DESERT|TEAL|CREAM|SAND|STORM|TITANIUM|ULTRAMARINE|BURGUNDY|GRAPHITE)(\s.*)?$/i,'').trim();
+    if (!grupos[base]) grupos[base] = 0;
+    grupos[base] += item.qty;
+  }
+  const lines = ['STOCK NUEVOS SIN ACTIVAR (distribuidor oficial Apple):'];
+  const keys = Object.keys(grupos);
+  for (let i = 0; i < keys.length; i++) {
+    lines.push('- ' + keys[i] + ': ' + grupos[keys[i]] + 'u');
+  }
+  const totalRefu = stockData.filter(function(i) { return i.qty > 0 && /\s[-]\s*(GA\+?-?|GAB|GB)$/i.test(i.desc); }).reduce(function(s,i) { return s+i.qty; }, 0);
+  if (totalRefu > 0) lines.push('REFU/USADOS: ' + totalRefu + 'u disponibles (precios a consultar)');
+  lines.push('Ver stock completo: https://south-traders.pangea.ar/n6/stock_disp#');
+  return lines.join('\n');
+}
+
+function buildPrompt() {
+  return 'Sos Sophia, agente comercial de South Traders — distribuidor oficial de Apple en Miami.\n\n' +
+    'PERSONALIDAD:\n' +
+    '- Mujer profesional, segura, con carisma y una chispa de seduccion sutil\n' +
+    '- Encantadora pero sin pasarte. Calidez genuina, nunca robotica.\n' +
+    '- Haces sentir al cliente especial. Cuando hace un buen pedido, se lo reconoces.\n\n' +
+    'EMPRESA:\n' +
+    '- Somos distribuidor oficial Apple. Tenemos iPhones, MacBooks, Samsung y accesorios.\n' +
+    '- Mayoristas para LATAM, El Caribe y el mundo.\n' +
+    '- Pago: Wire transfer in advance\n' +
+    '- Horario: Lun-Vie 9am-6pm ET\n' +
+    '- Contacto real: +1 786 559 1119 | info@southtraders.com\n' +
+    '- Direccion: 10850 NW 21st St, Suite 140, Miami FL 33172\n\n' +
+    'LOGISTICA:\n' +
+    '- FOB Miami (el cliente coordina el flete)\n' +
+    '- Delivery GRATIS en Doral para ordenes +$30,000 USD\n' +
+    '- Pickup en warehouse disponible\n' +
+    '- Pueden enviar alguien a verificar mercaderia al warehouse si lo solicitan\n\n' +
+    'PRODUCTOS:\n' +
+    '- Articulos SIN sufijo de grado son NUEVOS. Solo aclararlo si el cliente pregunta.\n' +
+    '- USADOS/REFU: sufijo GA, GA-, GAB, GB. Precios a consultar.\n' +
+    '- Ver stock: https://south-traders.pangea.ar/n6/stock_disp#\n\n' +
+    'PRECIOS (USD) - Lista Cash Tier 1 para clientes nuevos:\n' +
+    'iPhone Air 256GB $850 | 17e $545 | 17 256GB $780\n' +
+    'iPhone 17 Pro: 256GB $1050 | 512GB $1160 | 1TB $1300\n' +
+    'iPhone 17 Pro Max: 256GB $1150 | 512GB $1260 | 1TB $1420\n' +
+    'iPhone 16 128GB $640 | 16 Pro 128GB $850 | 256GB $960\n' +
+    'iPhone 15 128GB $530 | 15 Pro 128GB $720\n' +
+    'Samsung S25 Ultra 512GB $1070 | S26 Ultra 512GB $1170\n' +
+    'MacBook Air 13 M5 $1060 | 15 M4 $1200\n' +
+    'AirPods 4 $145 | AirPods Pro 3 $210\n\n' +
+    'CREDITO:\n' +
+    '- No manejamos credito con clientes nuevos\n' +
+    '- Luego de trabajar juntos pueden aplicar a credito\n' +
+    '- Los precios a credito son distintos a los de contado\n\n' +
+    'PROCESO DE COMPRA:\n' +
+    '1. Entender que busca el cliente (modelo, cantidad)\n' +
+    '2. Dar precio segun su tier (cash tier1 por defecto para clientes nuevos)\n' +
+    '3. Minimo de compra: 10 unidades\n' +
+    '4. Confirmar si el cliente esta registrado en nuestro sistema\n' +
+    '5. Pedir datos de logistica: pickup / inspeccion / delivery\n' +
+    '6. Armar proforma con los productos, cantidades y precios acordados\n' +
+    '7. Notificar al equipo que hay una orden para confirmar\n\n' +
+    'PROFORMA:\n' +
+    '- Cuando el cliente confirme interes real, arma una proforma clara con:\n' +
+    '  Detalle de productos | Cantidades | Precio unitario | Total USD\n' +
+    '  Condicion de pago: Wire transfer in advance\n' +
+    '  Terminos: FOB Miami\n' +
+    '- Indicia que un agente confirmara la orden al +1 786 559 1119\n\n' +
+    'ESTILO:\n' +
+    '- Habla siempre en plural: "tenemos", "manejamos", "trabajamos"\n' +
+    '- NO menciones que son nuevos/sin activar a menos que pregunten\n' +
+    '- NO menciones minimos a menos que pregunten\n' +
+    '- Mismo idioma que el cliente (espanol o ingles)\n' +
+    '- Respuestas concisas y directas, con calidez\n' +
+    '- Si piden hablar con alguien real: +1 786 559 1119\n' +
+    '- Pedidos grandes o consultas complejas: derivar al +1 786 559 1119\n\n' +const express = require('express');
+const path = require('path');
+const axios = require('axios');
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const app = express();
+app.use(express.json());
+
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OWNER_PHONE = process.env.OWNER_PHONE || '17865591119';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL ? { rejectUnauthorized: false } : false });
+
+async function initDB() {
+  await pool.query('CREATE TABLE IF NOT EXISTS conversations (phone TEXT, role TEXT, content TEXT, ts TIMESTAMPTZ DEFAULT NOW())');
+  await pool.query('CREATE TABLE IF NOT EXISTS crm_contacts (id SERIAL PRIMARY KEY, phone TEXT UNIQUE, name TEXT, country TEXT, company TEXT, interest TEXT, tier TEXT DEFAULT \'lead\', status TEXT DEFAULT \'new\', notes TEXT, last_contact TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW())');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE');
   await pool.query('CREATE TABLE IF NOT EXISTS outbound_campaigns (id SERIAL PRIMARY KEY, name TEXT, message TEXT, status TEXT DEFAULT \'pending\', created_at TIMESTAMPTZ DEFAULT NOW(), total_sent INT DEFAULT 0, total_failed INT DEFAULT 0)');
   await pool.query('CREATE TABLE IF NOT EXISTS outbound_logs (id SERIAL PRIMARY KEY, campaign_id INT, phone TEXT, status TEXT DEFAULT \'pending\', sent_at TIMESTAMPTZ, error TEXT)');
   console.log('DB OK');
@@ -176,6 +329,11 @@ async function handleMessage(phone, text) {
   }
   await sendWA(phone, reply);
   console.log('[OUT] ' + phone + ': ' + reply.slice(0,80));
+  // Notificar si Sophia armo una proforma
+  const isProforma = reply.toLowerCase().includes('proforma') || reply.toLowerCase().includes('wire transfer') || reply.toLowerCase().includes('total usd');
+  if (isProforma && phone !== OWNER_PHONE) {
+    sendWA(OWNER_PHONE, '\uD83D\uDCCB ORDEN PENDIENTE\nCliente: +' + phone + '\nRevisar y confirmar:\n' + reply.slice(0, 500)).catch(function(){});
+  }
 }
 
 // WEBHOOK
@@ -194,6 +352,28 @@ app.post('/webhook', function(req, res) {
 });
 
 // DASHBOARD
+function detectCountry(phone) {
+  if (phone.startsWith('549') || phone.startsWith('54')) return 'Argentina';
+  if (phone.startsWith('521') || phone.startsWith('52')) return 'Mexico';
+  if (phone.startsWith('571') || phone.startsWith('57')) return 'Colombia';
+  if (phone.startsWith('511') || phone.startsWith('51')) return 'Peru';
+  if (phone.startsWith('593')) return 'Ecuador';
+  if (phone.startsWith('56')) return 'Chile';
+  if (phone.startsWith('598')) return 'Uruguay';
+  if (phone.startsWith('595')) return 'Paraguay';
+  if (phone.startsWith('591')) return 'Bolivia';
+  if (phone.startsWith('507')) return 'Panama';
+  if (phone.startsWith('502')) return 'Guatemala';
+  if (phone.startsWith('503')) return 'El Salvador';
+  if (phone.startsWith('504')) return 'Honduras';
+  if (phone.startsWith('505')) return 'Nicaragua';
+  if (phone.startsWith('506')) return 'Costa Rica';
+  if (phone.startsWith('1')) return 'EEUU/Canada';
+  if (phone.startsWith('55')) return 'Brasil';
+  if (phone.startsWith('58')) return 'Venezuela';
+  return 'Otro';
+}
+
 app.post('/send', async function(req, res) {
   const b = req.body;
   if (!b.phone || !b.message) return res.status(400).json({error: 'faltan datos'});

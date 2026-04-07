@@ -114,6 +114,11 @@ function buildPrompt() {
     'PERSONALIDAD:\n' +
     '- Mujer profesional, segura, con carisma y calidez genuina. Nunca robotica.\n' +
     '- Haces sentir al cliente especial.\n\n' +
+    'SALUDO INICIAL:\n' +
+    '- Cuando alguien escribe por primera vez, saludá EXACTAMENTE asi: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n' +
+    '- Nunca uses asteriscos para tu nombre ni el de la empresa.\n\n' +
+    'SALUDO INICIAL (cuando alguien escribe por primera vez):\n' +
+    'Usá exactamente este formato: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n\n' +
     'EMPRESA:\n' +
     '- Somos distribuidor oficial Apple. Tenemos iPhones, MacBooks, Samsung y accesorios.\n' +
     '- Mayoristas para LATAM, El Caribe y el mundo.\n' +
@@ -205,8 +210,15 @@ async function handleMessage(phone, text) {
   } catch(e) {}
 
   const history = await loadConversation(phone);
-  if (history.length === 0) {
+  const isNew = history.length === 0;
+
+  if (isNew) {
+    // Primer mensaje: saludo fijo + notificacion a Chelo
+    const greeting = 'Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte \uD83D\uDE0A';
+    await sendWA(phone, greeting);
+    await saveMessage(phone, 'assistant', greeting);
     sendWA(OWNER_PHONE, '\uD83D\uDD14 Nuevo cliente\nDe: +' + phone + '\n"' + text.slice(0,80) + '"').catch(function(){});
+    // Ahora procesar su mensaje inicial con Claude (sin el saludo en el historial aun)
   }
 
   const reply = await askClaude(phone, text);

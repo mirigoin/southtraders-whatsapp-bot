@@ -96,6 +96,147 @@ function getStockSummary() {
 }
 
 function buildPrompt() {
+  return 'Sos Sophia, agente comercial de South Traders — distribuidor oficial Apple en Miami.\n\n' +
+    'PERSONALIDAD:\n' +
+    '- Mujer profesional, segura, con carisma y calidez genuina\n' +
+    '- Nunca robotica. Haces sentir al cliente especial.\n\n' +
+    'EMPRESA:\n' +
+    '- Somos distribuidor oficial Apple. Tenemos iPhones, MacBooks, Samsung y accesorios.\n' +
+    '- Mayoristas para LATAM, El Caribe y el mundo.\n' +
+    '- Pago: Wire transfer in advance\n' +
+    '- Horario: Lun-Vie 9am-6pm ET\n' +
+    '- Contacto: +1 786 559 1119 | sales@south-traders.com\n' +
+    '- Direccion: 10850 NW 21st St, Suite 140, Miami FL 33172\n\n' +
+    'LOGISTICA:\n' +
+    '- FOB Miami (el cliente coordina el flete)\n' +
+    '- Delivery GRATIS en Doral para ordenes +$30,000 USD\n' +
+    '- Pickup en warehouse disponible\n' +
+    '- Pueden enviar a alguien a verificar mercaderia al warehouse si lo solicitan\n\n' +
+    'PRODUCTOS:\n' +
+    '- Articulos SIN sufijo de grado son nuevos. Solo aclararlo si preguntan.\n' +
+    '- USADOS/REFU: sufijo GA, GA-, GAB, GB. Precios a consultar.\n' +
+    '- Stock: https://south-traders.pangea.ar/n6/stock_disp#\n\n' +
+    'PRECIOS USD - Lista cash para clientes nuevos:\n' +
+    'iPhone Air 256GB $850 | 17e $545 | 17 256GB $780\n' +
+    'iPhone 17 Pro: 256GB $1050 | 512GB $1160 | 1TB $1300\n' +
+    'iPhone 17 Pro Max: 256GB $1150 | 512GB $1260 | 1TB $1420\n' +
+    'iPhone 16 128GB $640 | 16 Pro 128GB $850 | 256GB $960\n' +
+    'iPhone 15 128GB $530 | 15 Pro 128GB $720\n' +
+    'Samsung S25 Ultra 512GB $1070 | S26 Ultra 512GB $1170\n' +
+    'MacBook Air 13 M5 $1060 | 15 M4 $1200\n' +
+    'AirPods 4 $145 | AirPods Pro 3 $210\n\n' +
+    'CREDITO:\n' +
+    '- Sin credito para clientes nuevos\n' +
+    '- Luego de trabajar juntos pueden aplicar. Precios a credito son distintos.\n\n' +
+    'PROCESO DE COMPRA:\n' +
+    '- Minimo 10 unidades (solo decirlo si preguntan)\n' +
+    '- Entender que busca, dar precio, confirmar logistica (pickup/inspeccion/delivery)\n' +
+    '- Armar proforma con productos, cantidades, precios, total USD\n' +
+    '  Condicion: Wire transfer in advance | Terminos: FOB Miami\n' +
+    '- Avisar que un agente del equipo confirmara la orden\n\n' +
+    'ESTILO:\n' +
+    '- Habla siempre en plural: tenemos, manejamos, trabajamos\n' +
+    '- NO menciones nuevos/sin activar ni minimos salvo que pregunten\n' +
+    '- Mismo idioma que el cliente (espanol o ingles)\n' +
+    '- Conciso y directo, con calidez\n' +
+    '- Pedidos grandes o hablar con alguien: +1 786 559 1119 | sales@south-traders.com\n\n' +const express = require('express');
+const path = require('path');
+const axios = require('axios');
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const app = express();
+app.use(express.json());
+
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OWNER_PHONE = process.env.OWNER_PHONE || '17865591119';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+const pool = new Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL ? { rejectUnauthorized: false } : false });
+
+async function initDB() {
+  await pool.query('CREATE TABLE IF NOT EXISTS conversations (phone TEXT, role TEXT, content TEXT, ts TIMESTAMPTZ DEFAULT NOW())');
+  await pool.query('CREATE TABLE IF NOT EXISTS crm_contacts (id SERIAL PRIMARY KEY, phone TEXT UNIQUE, name TEXT, country TEXT, company TEXT, interest TEXT, tier TEXT DEFAULT \'lead\', status TEXT DEFAULT \'new\', notes TEXT, last_contact TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW())');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT \'tier1\'');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS registered BOOLEAN DEFAULT FALSE');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS logistics TEXT');
+  await pool.query('ALTER TABLE crm_contacts ADD COLUMN IF NOT EXISTS pending_order BOOLEAN DEFAULT FALSE');
+  await pool.query('CREATE TABLE IF NOT EXISTS outbound_campaigns (id SERIAL PRIMARY KEY, name TEXT, message TEXT, status TEXT DEFAULT \'pending\', created_at TIMESTAMPTZ DEFAULT NOW(), total_sent INT DEFAULT 0, total_failed INT DEFAULT 0)');
+  await pool.query('CREATE TABLE IF NOT EXISTS outbound_logs (id SERIAL PRIMARY KEY, campaign_id INT, phone TEXT, status TEXT DEFAULT \'pending\', sent_at TIMESTAMPTZ, error TEXT)');
+  console.log('DB OK');
+}
+
+async function loadConversation(phone) {
+  try {
+    const r = await pool.query('SELECT role, content, ts FROM conversations WHERE phone=$1 ORDER BY ts DESC LIMIT 10', [phone]);
+    return r.rows.reverse();
+  } catch(e) { return []; }
+}
+
+async function saveMessage(phone, role, content) {
+  try { await pool.query('INSERT INTO conversations (phone, role, content) VALUES ($1,$2,$3)', [phone, role, content]); } catch(e) {}
+}
+
+async function upsertContact(phone) {
+  try {
+    const country = detectCountry(phone);
+    await pool.query(
+      'INSERT INTO crm_contacts (phone, country) VALUES ($1, $2) ON CONFLICT (phone) DO UPDATE SET last_contact=NOW()',
+      [phone, country]
+    );
+  } catch(e) {}
+}
+
+// STOCK
+let stockData = [];
+let stockLastUpdated = null;
+
+async function fetchStock() {
+  try {
+    const resp = await axios.get('https://south-traders.pangea.ar/n6/stock_disp', { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const rows = [];
+    const trRe = /<tr[^>]*>([sS]*?)<\/tr>/gi;
+    let tr;
+    while ((tr = trRe.exec(resp.data)) !== null) {
+      const cells = [];
+      const tdRe = /<td[^>]*>([sS]*?)<\/td>/gi;
+      let td;
+      while ((td = tdRe.exec(tr[1])) !== null) cells.push(td[1].replace(/<[^>]+>/g,'').trim());
+      if (cells.length >= 3 && cells[0] && cells[1]) rows.push({ desc: cells[1], qty: parseInt(cells[2])||0, transit: parseInt(cells[3])||0 });
+    }
+    if (rows.length > 0) { stockData = rows; stockLastUpdated = new Date(); console.log('Stock OK: ' + rows.length); }
+  } catch(e) { console.error('Stock error:', e.message); }
+}
+
+fetchStock();
+setInterval(fetchStock, 6 * 3600 * 1000);
+
+function getStockSummary() {
+  if (!stockData.length) return 'Stock actualizandose.';
+  const nuevos = stockData.filter(function(i) { return i.qty > 0 && !/\s[-]\s*(GA\+?-?|GAB|GB|IND)$/i.test(i.desc); });
+  const grupos = {};
+  for (let i = 0; i < nuevos.length; i++) {
+    const item = nuevos[i];
+    const base = item.desc.replace(/\s+(BLACK|BLUE|PINK|WHITE|GREEN|YELLOW|RED|PURPLE|SILVER|GOLD|STARLIGHT|MIDNIGHT|NATURAL|DESERT|TEAL|CREAM|SAND|STORM|TITANIUM|ULTRAMARINE|BURGUNDY|GRAPHITE)(\s.*)?$/i,'').trim();
+    if (!grupos[base]) grupos[base] = 0;
+    grupos[base] += item.qty;
+  }
+  const lines = ['STOCK NUEVOS SIN ACTIVAR (distribuidor oficial Apple):'];
+  const keys = Object.keys(grupos);
+  for (let i = 0; i < keys.length; i++) {
+    lines.push('- ' + keys[i] + ': ' + grupos[keys[i]] + 'u');
+  }
+  const totalRefu = stockData.filter(function(i) { return i.qty > 0 && /\s[-]\s*(GA\+?-?|GAB|GB)$/i.test(i.desc); }).reduce(function(s,i) { return s+i.qty; }, 0);
+  if (totalRefu > 0) lines.push('REFU/USADOS: ' + totalRefu + 'u disponibles (precios a consultar)');
+  lines.push('Ver stock completo: https://south-traders.pangea.ar/n6/stock_disp#');
+  return lines.join('\n');
+}
+
+function buildPrompt() {
   return 'Sos Sophia, agente comercial de South Traders — distribuidor oficial de Apple en Miami.\n\n' +
     'PERSONALIDAD:\n' +
     '- Mujer profesional, segura, con carisma y una chispa de seduccion sutil\n' +

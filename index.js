@@ -106,7 +106,7 @@ function buildPrompt() {
     '- Mayoristas para LATAM, El Caribe y el mundo.\n' +
     '- Pago: Wire transfer in advance\n' +
     '- Horario: Lun-Vie 9am-6pm ET\n' +
-    '- Contacto real: +1 786 559 1119 | info@southtraders.com\n' +
+    '- Contacto: +1 786 559 1119 | sales@south-traders.com\n' +
     '- Direccion: 10850 NW 21st St, Suite 140, Miami FL 33172\n\n' +
     'LOGISTICA:\n' +
     '- FOB Miami (el cliente coordina el flete)\n' +
@@ -143,15 +143,15 @@ function buildPrompt() {
     '  Detalle de productos | Cantidades | Precio unitario | Total USD\n' +
     '  Condicion de pago: Wire transfer in advance\n' +
     '  Terminos: FOB Miami\n' +
-    '- Indicia que un agente confirmara la orden al +1 786 559 1119\n\n' +
+    '- Indica que un agente confirmara la orden al +1 786 559 1119 | sales@south-traders.com\n\n' +
     'ESTILO:\n' +
     '- Habla siempre en plural: "tenemos", "manejamos", "trabajamos"\n' +
     '- NO menciones que son nuevos/sin activar a menos que pregunten\n' +
     '- NO menciones minimos a menos que pregunten\n' +
     '- Mismo idioma que el cliente (espanol o ingles)\n' +
     '- Respuestas concisas y directas, con calidez\n' +
-    '- Si piden hablar con alguien real: +1 786 559 1119\n' +
-    '- Pedidos grandes o consultas complejas: derivar al +1 786 559 1119\n\n' +const express = require('express');
+    '- Si piden hablar con alguien real: +1 786 559 1119 | sales@south-traders.com\n' +
+    '- Pedidos grandes o consultas complejas: derivar al +1 786 559 1119 | sales@south-traders.com\n\n' +const express = require('express');
 const path = require('path');
 const axios = require('axios');
 const { Pool } = require('pg');
@@ -310,6 +310,11 @@ async function sendWA(to, text) {
 async function handleMessage(phone, text) {
   console.log('[IN] ' + phone + ': ' + text);
   await upsertContact(phone);
+  // Respuesta automatica a audios
+  if (text === '__AUDIO__') {
+    await sendWA(phone, 'Hola! Recib\u00ed tu audio pero no puedo escucharlo. \u00bfPod\u00e9s escribirme tu consulta? Con gusto te ayudo \uD83D\uDE0A');
+    return;
+  }
   // Chequear si el contacto está pausado (Chelo toma el control)
   try {
     const pauseCheck = await pool.query('SELECT paused FROM crm_contacts WHERE phone=$1', [phone]);
@@ -349,6 +354,9 @@ app.post('/webhook', function(req, res) {
   if (!msgs || !msgs.length) return;
   const m = msgs[0];
   if (m.type === 'text') handleMessage(m.from, m.text && m.text.body || '').catch(console.error);
+  if (m.type === 'audio' || m.type === 'voice') {
+    handleMessage(m.from, '__AUDIO__').catch(console.error);
+  }
 });
 
 // DASHBOARD

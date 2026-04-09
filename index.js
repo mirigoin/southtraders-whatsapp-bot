@@ -135,15 +135,15 @@ function buildPrompt() {
     '- Articulos SIN sufijo de grado son nuevos. Solo aclararlo si preguntan.\n' +
     '- USADOS/REFU: sufijo GA, GA-, GAB, GB. Precios a consultar.\n' +
     '- Stock: https://south-traders.pangea.ar/n6/stock_disp#\n\n' +
-    'PRECIOS USD (lista cash, clientes nuevos):\n' +
-    'iPhone Air 256GB $850 | 17e $545 | 17 256GB $780\n' +
-    'iPhone 17 Pro: 256GB $1050 | 512GB $1160 | 1TB $1300\n' +
-    'iPhone 17 Pro Max: 256GB $1150 | 512GB $1260 | 1TB $1420\n' +
-    'iPhone 16 128GB $640 | 16 Pro 128GB $850 | 256GB $960\n' +
-    'iPhone 15 128GB $530 | 15 Pro 128GB $720\n' +
-    'Samsung S25 Ultra 512GB $1070 | S26 Ultra 512GB $1170\n' +
-    'MacBook Air 13 M5 $1060 | 15 M4 $1200\n' +
-    'AirPods 4 $145 | AirPods Pro 3 $210\n\n' +
+    'PRECIOS USD (lista cash, clientes nuevos) - Actualizado 08/04:\n' +
+    'iPhone Air 256GB $845 | iPhone 17 256GB $745\n' +
+    'iPhone 17 Pro: 256GB $1,165 | 512GB $1,350\n' +
+    'iPhone 17 Pro Max: 256GB $1,290 | 512GB $1,470 | 1TB $1,670\n' +
+    'iPhone 16 128GB $662 | iPhone 15 128GB $546\n' +
+    'Samsung S26 Ultra 512GB $1,155 | S25 Ultra 512GB $880\n' +
+    'MacBook Air 13" M5 $1,030 | 15" M5 $1,230\n' +
+    'AirPods 4 $100 | AirPods Pro 3 $210\n' +
+    'iPad 11th Gen A16 WiFi 128GB $308 | Apple Watch Ultra 3 $690\n\n' +
     'CREDITO:\n' +
     '- Sin credito para clientes nuevos.\n' +
     '- Luego de trabajar juntos pueden aplicar. Los precios a credito son distintos.\n\n' +

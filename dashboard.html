@@ -3,198 +3,195 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sophia Dashboard - South Traders</title>
+<title>South Traders Dashboard</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
-body{background:#f5f5f5;padding:16px;color:#111}
-.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-h1{font-size:18px;font-weight:600}
-.badge{font-size:11px;padding:3px 8px;border-radius:10px;background:#d1fae5;color:#065f46;font-weight:500}
-.badge.off{background:#fee2e2;color:#991b1b}
-fix: agregar boton pausar en HTML del dashboard.stat{background:#fff;border-radius:10px;padding:12px;border:1px solid #e5e5e5}
-.stat-lbl{font-size:11px;color:#888;margin-bottom:4px}
-.stat-val{font-size:22px;font-weight:600}
-.layout{display:grid;grid-template-columns:220px 1fr;gap:10px}
-@media(max-width:600px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
-.sidebar{background:#fff;border-radius:10px;border:1px solid #e5e5e5;overflow-y:auto;max-height:520px}
-.sh{padding:8px 12px;font-size:11px;color:#888;border-bottom:1px solid #eee;text-transform:uppercase;letter-spacing:.05em;background:#fafafa}
-.contact{padding:10px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0}
-.contact:hover{background:#f5f5f5}
-.contact.active{background:#e8f0fe}
-.cp{font-size:13px;font-weight:600;margin-bottom:2px}
-.cv{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ct{font-size:10px;color:#bbb;margin-top:2px}
-.chat{background:#fff;border-radius:10px;border:1px solid #e5e5e5;display:flex;flex-direction:column}
-.cht{padding:10px 14px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;background:#fafafa;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center}
-.cb{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:350px;max-height:460px}
-.mw{display:flex;flex-direction:column}
-.mw.user{align-items:flex-end}
-.mw.assistant{align-items:flex-start}
-.m{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word;white-space:pre-wrap}
-.m.user{background:#e8f0fe;color:#1a56c4;border-bottom-right-radius:3px}
-.m.assistant{background:#f0f0f0;color:#111;border-bottom-left-radius:3px}
-.mt{font-size:10px;color:#bbb;margin-top:2px}
-.empty{display:flex;align-items:center;justify-content:center;height:200px;color:#bbb;font-size:13px}
-.btn{font-size:12px;padding:5px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;background:#fff}
-.clr{font-size:11px;padding:3px 8px;border:1px solid #fca5a5;border-radius:5px;cursor:pointer;background:#fff;color:#dc2626}
-.pause-btn{font-size:11px;padding:3px 10px;border-radius:5px;cursor:pointer;font-weight:500;border:none}
-.pause-btn.active{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
-.pause-btn.paused{background:#dcfce7;color:#166534;border:1px solid #86efac}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a}
+header{background:#1a1a2e;color:white;padding:14px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+header h1{font-size:18px;font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ts{font-size:12px;color:#aaa;margin-left:auto}
+.wrap{max-width:1000px;margin:0 auto;padding:20px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.stat{background:white;border-radius:10px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.stat .n{font-size:30px;font-weight:700;color:#1a1a2e}
+.stat .l{font-size:12px;color:#777;margin-top:3px}
+.sendbox{background:white;border-radius:10px;padding:18px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.sendbox h2{font-size:14px;font-weight:600;margin-bottom:10px;color:#1a1a2e}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row input{flex:1;min-width:130px;border:1px solid #ddd;border-radius:7px;padding:9px 12px;font-size:13px}
+.row input:focus{outline:none;border-color:#1a1a2e}
+.btn{padding:9px 16px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer}
+.btn-blue{background:#1a1a2e;color:white}
+.btn-blue:hover{background:#2d2d4e}
+.btn-red{background:#ef4444;color:white;font-size:11px;padding:5px 10px}
+.btn-red:hover{background:#dc2626}
+.btn-orange{background:#f59e0b;color:white;font-size:11px;padding:5px 10px}
+.btn-orange:hover{background:#d97706}
+.btn-green{background:#22c55e;color:white;font-size:11px;padding:5px 10px}
+.btn-green:hover{background:#16a34a}
+.contacts{display:flex;flex-direction:column;gap:14px}
+.card{background:white;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+.card-head{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;border-bottom:1px solid #f0f0f0}
+.card-head:hover{background:#fafafa}
+.avatar{width:38px;height:38px;border-radius:50%;background:#1a1a2e;color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.info{flex:1}
+.phone{font-weight:600;font-size:14px}
+.meta{font-size:11px;color:#888;margin-top:2px}
+.actions{display:flex;gap:6px;align-items:center}
+.badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.badge-on{background:#dcfce7;color:#166534}
+.badge-off{background:#fef3c7;color:#92400e}
+.chev{font-size:11px;color:#bbb;transition:transform .2s}
+.chev.open{transform:rotate(180deg)}
+.msgs{display:none;flex-direction:column;gap:6px;padding:14px 18px;background:#f9fafb;max-height:380px;overflow-y:auto}
+.msgs.open{display:flex}
+.mwrap{display:flex;flex-direction:column}
+.mwrap.assistant{align-items:flex-end}
+.msg{max-width:72%;padding:9px 13px;border-radius:10px;font-size:13px;line-height:1.5}
+.msg.user{background:#e8f0fe;color:#1a1a1a;border-bottom-left-radius:3px}
+.msg.assistant{background:#1a1a2e;color:white;border-bottom-right-radius:3px}
+.mtime{font-size:10px;opacity:.5;margin-top:2px}
+.reply{padding:10px 18px;border-top:1px solid #eee;display:none;gap:8px}
+.reply.open{display:flex}
+.reply input{flex:1;border:1px solid #ddd;border-radius:7px;padding:9px 12px;font-size:13px}
+.reply input:focus{outline:none;border-color:#1a1a2e}
+.empty{text-align:center;padding:50px;color:#bbb}
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:white;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
 </style>
 </head>
 <body>
-<div class="hdr">
-  <h1>Sophia - South Traders</h1>
-  <div style="display:flex;gap:8px;align-items:center">
-    <span id="badge" class="badge off">conectando...</span>
-    <button class="btn" onclick="load()">Actualizar</button>
+<header>
+  <div class="dot"></div>
+  <h1>South Traders — Sophia</h1>
+  <span class="ts" id="ts">Cargando...</span>
+</header>
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="n" id="nContacts">0</div><div class="l">Contactos</div></div>
+    <div class="stat"><div class="n" id="nMsgs">0</div><div class="l">Mensajes</div></div>
+    <div class="stat"><div class="n" id="nPaused">0</div><div class="l">Pausados</div></div>
   </div>
-</div>
-<div class="stats">
-  <div class="stat"><div class="stat-lbl">Conversaciones</div><div class="stat-val" id="st">-</div></div>
-  <div class="stat"><div class="stat-lbl">Mensajes totales</div><div class="stat-val" id="sm">-</div></div>
-  <div class="stat"><div class="stat-lbl">Actualizado</div><div class="stat-val" style="font-size:13px;padding-top:5px" id="su">-</div></div>
-</div>
-<div class="layout">
-  <div class="sidebar">
-    <div class="sh">Contactos</div>
-    <div id="contacts"></div>
-  </div>
-  <div class="chat">
-    <div class="cht">
-      <span id="ct">Selecciona un contacto</span>
-      <div style="display:flex;gap:6px">
-        <button class="pause-btn active" id="pausebtn" style="display:none" onclick="togglePause()">&#9646;&#9646; Pausar Sophia</button>
-        <button class="clr" id="clrbtn" style="display:none" onclick="clrHist()">Borrar historial</button>
-      </div>
+  <div class="sendbox">
+    <h2>✉️ Enviar mensaje directo</h2>
+    <div class="row">
+      <input id="sPhone" placeholder="Número ej: 5491112345678">
+      <input id="sMsg" placeholder="Mensaje..." style="flex:3">
+      <button class="btn btn-blue" onclick="sendDirect()">Enviar</button>
     </div>
-    <div class="cb" id="cb"><div class="empty">Elige un contacto</div></div>
   </div>
+  <div id="list" class="contacts"><div class="empty">Cargando...</div></div>
 </div>
+<div class="toast" id="toast"></div>
 <script>
-const BOT = 'https://southtraders-whatsapp-bot.onrender.com';
-let convs = {}, sel = null;
+let crm={};
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function fmt(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}
 
-function fmt(p) {
-  if (p.startsWith('549')) return '+54 9 ' + p.slice(3,5) + ' ' + p.slice(5,9) + '-' + p.slice(9);
-  if (p.startsWith('1') && p.length === 11) return '+1 (' + p.slice(1,4) + ') ' + p.slice(4,7) + '-' + p.slice(7);
-  return '+' + p;
-}
-function ft(ts) {
-  if (!ts) return '';
-  try { return new Date(ts).toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}); } catch(e) { return ''; }
-}
-function fd(ts) {
-  if (!ts) return '';
-  try {
-    const d = new Date(ts);
-    return d.toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
-  } catch(e) { return ''; }
-}
-
-function rc() {
-  const phones = Object.keys(convs).sort(function(a,b) {
-    const al = convs[a].messages && convs[a].messages.length ? convs[a].messages[convs[a].messages.length-1].ts : '';
-    const bl = convs[b].messages && convs[b].messages.length ? convs[b].messages[convs[b].messages.length-1].ts : '';
-    return bl.localeCompare(al);
-  });
-  const el = document.getElementById('contacts');
-  if (!phones.length) { el.innerHTML = '<div class="empty" style="height:80px;font-size:12px">Sin conversaciones</div>'; return; }
-  el.innerHTML = phones.map(function(p) {
-    const msgs = convs[p].messages || [];
-    const last = msgs[msgs.length-1];
-    const preview = last ? last.content.substring(0,40) + '...' : '';
-    const active = p === sel ? ' active' : '';
-    return '<div class="contact' + active + '" data-ph="' + p + '" onclick="sc(this.getAttribute(\x27data-ph\x27))">' +
-      '<div class="cp">' + fmt(p) + '</div>' +
-      '<div class="cv">' + preview + '</div>' +
-      '<div class="ct">' + msgs.length + ' msgs - ' + (last ? fd(last.ts) : '') + '</div>' +
-      '</div>';
-  }).join('');
-}
-
-function sc(phone) {
-  sel = phone;
-  rc();
-  const msgs = (convs[phone] && convs[phone].messages) || [];
-  document.getElementById('ct').textContent = fmt(phone) + ' - ' + msgs.length + ' mensajes';
-  document.getElementById('clrbtn').style.display = 'block';
-  const cb = document.getElementById('cb');
-  if (!msgs.length) { cb.innerHTML = '<div class="empty">Sin mensajes</div>'; return; }
-  cb.innerHTML = msgs.map(function(m) {
-    return '<div class="mw ' + m.role + '">' +
-      '<div class="m ' + m.role + '">' + m.content.replace(/</g, '&lt;') + '</div>' +
-      '<div class="mt">' + (m.role === 'assistant' ? 'Sophia - ' : '') + ft(m.ts) + '</div>' +
-      '</div>';
-  }).join('');
-  cb.scrollTop = cb.scrollHeight;
-}
-
-async function clrHist() {
-  if (!sel) return;
-  if (!confirm('Borrar historial de ' + fmt(sel) + '?')) return;
-  try {
-    await fetch(BOT + '/conversations/clear', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({phone: sel})
+async function load(){
+  try{
+    const [cr,cv]=await Promise.all([fetch('/crm/contacts').then(r=>r.json()),fetch('/conversations').then(r=>r.json())]);
+    crm={};
+    (cr.contacts||[]).forEach(c=>crm[c.phone]=c);
+    const convs=cv.conversations||{};
+    const phones=Object.keys(convs);
+    let tm=0,tp=0;
+    phones.forEach(p=>{tm+=(convs[p].messages||[]).length;if(crm[p]&&crm[p].paused)tp++});
+    document.getElementById('nContacts').textContent=phones.length;
+    document.getElementById('nMsgs').textContent=tm;
+    document.getElementById('nPaused').textContent=tp;
+    document.getElementById('ts').textContent='Actualizado: '+new Date().toLocaleTimeString('es-AR');
+    phones.sort((a,b)=>{
+      const ma=convs[a].messages||[],mb=convs[b].messages||[];
+      const ta=ma.length?new Date(ma[ma.length-1].ts):0,tb=mb.length?new Date(mb[mb.length-1].ts):0;
+      return tb-ta;
     });
-    await load();
-    document.getElementById('cb').innerHTML = '<div class="empty">Historial borrado</div>';
-  } catch(e) { alert('Error al borrar'); }
+    const list=document.getElementById('list');
+    if(!phones.length){list.innerHTML='<div class="empty">Sin conversaciones aún.</div>';return}
+    list.innerHTML=phones.map(p=>{
+      const msgs=convs[p].messages||[];
+      const last=msgs.length?msgs[msgs.length-1]:null;
+      const c=crm[p]||{};
+      const paused=c.paused;
+      const msgsHtml=msgs.map(m=>`<div class="mwrap ${m.role}"><div class="msg ${m.role}">${esc(m.content)}</div><div class="mtime">${fmt(m.ts)}</div></div>`).join('');
+      return `<div class="card" id="card-${p}">
+        <div class="card-head" onclick="toggle('${p}')">
+          <div class="avatar">${p.slice(-2)}</div>
+          <div class="info">
+            <div class="phone">+${p}${c.country?' · '+c.country:''}</div>
+            <div class="meta">${msgs.length} mensajes${last?' · '+fmt(last.ts):''}</div>
+          </div>
+          <div class="actions" onclick="event.stopPropagation()">
+            <span class="badge ${paused?'badge-off':'badge-on'}" id="badge-${p}">${paused?'⏸ Pausado':'🟢 Activo'}</span>
+            <button class="${paused?'btn btn-green':'btn btn-orange'}" id="pbtn-${p}" onclick="togglePause('${p}',${paused})">${paused?'▶ Reanudar':'⏸ Pausar'}</button>
+            <button class="btn btn-red" onclick="clearH('${p}')">🗑 Borrar</button>
+          </div>
+          <div class="chev" id="chev-${p}">▼</div>
+        </div>
+        <div class="msgs" id="msgs-${p}">${msgsHtml}</div>
+        <div class="reply" id="reply-${p}">
+          <input id="ri-${p}" placeholder="Escribir como Sophia..." onkeydown="if(event.key==='Enter')reply('${p}')">
+          <button class="btn btn-blue" onclick="reply('${p}')">Enviar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('list').innerHTML='<div class="empty">Error al cargar: '+e.message+'</div>'}
 }
 
-let isPaused = false;
-
-async function togglePause() {
-  if (!sel) return;
-  isPaused = !isPaused;
-  try {
-    await fetch(BOT + '/crm/pause', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({phone: sel, paused: isPaused})
-    });
-    updatePauseBtn();
-  } catch(e) { alert('Error al pausar'); isPaused = !isPaused; }
+function toggle(p){
+  const m=document.getElementById('msgs-'+p);
+  const c=document.getElementById('chev-'+p);
+  const r=document.getElementById('reply-'+p);
+  const open=m.classList.toggle('open');
+  c.classList.toggle('open',open);
+  r.classList.toggle('open',open);
+  if(open)m.scrollTop=m.scrollHeight;
 }
 
-function updatePauseBtn() {
-  const btn = document.getElementById('pausebtn');
-  if (!btn) return;
-  if (isPaused) {
-    btn.textContent = '▶ Reanudar Sophia';
-    btn.className = 'pause-btn paused';
-  } else {
-    btn.textContent = '⏸ Pausar Sophia';
-    btn.className = 'pause-btn active';
-  }
+async function togglePause(p,paused){
+  const np=!paused;
+  await fetch('/crm/pause',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,paused:np})});
+  document.getElementById('badge-'+p).textContent=np?'⏸ Pausado':'🟢 Activo';
+  document.getElementById('badge-'+p).className='badge '+(np?'badge-off':'badge-on');
+  document.getElementById('pbtn-'+p).textContent=np?'▶ Reanudar':'⏸ Pausar';
+  document.getElementById('pbtn-'+p).className=np?'btn btn-green':'btn btn-orange';
+  if(crm[p])crm[p].paused=np;
+  toast(np?'⏸ Pausado +'+p:'▶ Reactivado +'+p);
 }
 
-async function load() {
-  const badge = document.getElementById('badge');
-  try {
-    const r = await fetch(BOT + '/conversations');
-    const data = await r.json();
-    convs = data.conversations || {};
-    const phones = Object.keys(convs);
-    const total = phones.reduce(function(s,p) { return s + (convs[p].messages||[]).length; }, 0);
-    document.getElementById('st').textContent = phones.length;
-    document.getElementById('sm').textContent = total;
-    document.getElementById('su').textContent = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    badge.textContent = 'en vivo';
-    badge.className = 'badge';
-    rc();
-    if (sel && convs[sel]) sc(sel);
-    else if (phones.length && !sel) sc(phones[0]);
-  } catch(e) {
-    badge.textContent = 'sin conexion';
-    badge.className = 'badge off';
-  }
+async function clearH(p){
+  if(!confirm('¿Borrar historial de +'+p+'?'))return;
+  await fetch('/conversations/clear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p})});
+  toast('✅ Historial borrado');
+  load();
+}
+
+async function reply(p){
+  const inp=document.getElementById('ri-'+p);
+  const msg=inp.value.trim();
+  if(!msg)return;
+  inp.value='';
+  await fetch('/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,message:msg})});
+  toast('✅ Enviado a +'+p);
+  setTimeout(load,1000);
+}
+
+async function sendDirect(){
+  const p=document.getElementById('sPhone').value.trim().replace(/\D/g,'');
+  const m=document.getElementById('sMsg').value.trim();
+  if(!p||!m){toast('Completá número y mensaje');return}
+  await fetch('/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:p,message:m})});
+  document.getElementById('sPhone').value='';
+  document.getElementById('sMsg').value='';
+  toast('✅ Enviado a +'+p);
+  setTimeout(load,1000);
 }
 
 load();
-setInterval(load, 10000);
+setInterval(load,30000);
 </script>
 </body>
 </html>

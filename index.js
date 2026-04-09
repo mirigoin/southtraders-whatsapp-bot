@@ -109,6 +109,32 @@ function getStockSummary() {
   return lines.join('\n');
 }
 
+
+// VERIFICAR STOCK EN NORTHTRADERS
+async function checkNorthtraders(product) {
+  try {
+    const resp = await axios.get('https://northtraders.oppen.io/report/shared?shared=fe0f1305-3a71-4b78-be99-e54e3396cbdd', {
+      timeout: 10000,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const html = resp.data;
+    // Buscar filas que contengan el producto
+    const lines = html.split('\n');
+    const matches = [];
+    const searchTerm = product.toLowerCase();
+    for (const line of lines) {
+      const clean = line.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (clean.toLowerCase().includes(searchTerm) && clean.match(/\d+/)) {
+        matches.push(clean.slice(0, 150));
+      }
+    }
+    return matches.slice(0, 5).join('\n') || null;
+  } catch(e) {
+    console.error('Northtraders error:', e.message);
+    return null;
+  }
+}
+
 function buildPrompt() {
   return 'Sos Sophia, agente comercial de South Traders, distribuidor oficial Apple en Miami.\n\n' +
     'PERSONALIDAD:\n' +
@@ -134,7 +160,10 @@ function buildPrompt() {
     'PRODUCTOS:\n' +
     '- Articulos SIN sufijo de grado son nuevos. Solo aclararlo si preguntan.\n' +
     '- USADOS/REFU: sufijo GA, GA-, GAB, GB. Precios a consultar.\n' +
-    '- Stock: https://south-traders.pangea.ar/n6/stock_disp#\n\n' +
+    '- Stock general: https://south-traders.pangea.ar/n6/stock_disp#\n' +
+    '- Si preguntan por stock en general o quieren ver todo el stock, manda el link de Pangea.\n' +
+    '- Si preguntan PUNTUALMENTE cuantas unidades hay de un modelo especifico (ej: cuantos iPhone 16 tienen), SIEMPRE verifica primero en Northtraders antes de responder. No inventes cantidades.\n' +
+    '- Si el stock de Pangea no alcanza para el pedido, busca disponibilidad adicional en Northtraders.\n\n' +
     'PRECIOS USD (lista cash, clientes nuevos) - Actualizado 08/04:\n' +
     'iPhone Air 256GB $845 | iPhone 17 256GB $745\n' +
     'iPhone 17 Pro: 256GB $1,165 | 512GB $1,350\n' +
@@ -221,7 +250,31 @@ async function handleMessage(phone, text) {
     // Ahora procesar su mensaje inicial con Claude (sin el saludo en el historial aun)
   }
 
-  const reply = await askClaude(phone, text);
+  // Detectar si es consulta puntual de stock
+  let extraContext = '';
+  const textLower = text.toLowerCase();
+  const isStockQuery = (textLower.includes('cuantos') || textLower.includes('cuántos') || 
+    textLower.includes('tienen') || textLower.includes('disponible') || 
+    textLower.includes('stock') || textLower.includes('hay')) &&
+    (textLower.includes('iphone') || textLower.includes('samsung') || 
+     textLower.includes('macbook') || textLower.includes('ipad'));
+  
+  if (isStockQuery) {
+    // Extraer el modelo del mensaje
+    const models = ['iphone 17 pro max', 'iphone 17 pro', 'iphone 17', 'iphone 16 pro', 'iphone 16', 'iphone 15 pro', 'iphone 15', 's26 ultra', 's25 ultra', 'macbook air', 'macbook pro', 'ipad'];
+    let searchModel = null;
+    for (const m of models) {
+      if (textLower.includes(m)) { searchModel = m; break; }
+    }
+    if (searchModel) {
+      const ntData = await checkNorthtraders(searchModel);
+      if (ntData) {
+        extraContext = '\n\n[DATOS DE STOCK NORTHTRADERS para "' + searchModel + '"]:\n' + ntData + '\n[Usa estos datos para responder con precision sobre disponibilidad]';
+      }
+    }
+  }
+
+  const reply = await askClaude(phone, text + extraContext);
   if (!reply) {
     await sendWA(phone, 'Disculpa la demora! Escribinos al +1 786 559 1119 o a sales@south-traders.com y te atendemos enseguida');
     return;

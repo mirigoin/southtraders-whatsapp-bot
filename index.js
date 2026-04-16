@@ -198,6 +198,16 @@ async function buildPrompt() {
     '- Si el stock de Pangea no alcanza para el pedido, busca disponibilidad adicional en Northtraders.\n\n' +
     'PRECIOS USD (Lista Cash Tier 1, clientes nuevos):\n' +
     (cachedPrices ? cachedPrices.join('\n') : 'Precios no disponibles') + '\n\n' +
+      'PESOS POR PRODUCTO (kg):\\n' +
+    'Apple 20W USB-C Adapter: 0.08 | Apple 40W USB-C Adapter: 0.10\\n' +
+    'iPhone 16: 0.32 | iPhone 17: 0.33 | iPhone 17 E: 0.32\\n' +
+    'iPhone 17 Pro: 0.36 | iPhone 17 Pro Max: 0.40 | iPhone Air: 0.30\\n' +
+    'Apple Watch Ultra 3: 0.44\\n' +
+    'MacBook Air 13" M5: 1.95 | MacBook Air 15" M5: 2.40\\n' +
+    'MacBook Neo 13" A18 Pro: 1.80\\n' +
+    'Samsung Galaxy A17: 0.27 | Galaxy A57: 0.31\\n' +
+    'Samsung Galaxy S25 Ultra: 0.37 | Galaxy S26 Ultra: 0.37\\n' +
+    'IMPORTANTE: Usa SOLO estos pesos. NO inventes pesos. Si no esta en la lista, decile al cliente que lo consultas.\\n\\n' +
     'CREDITO:\n' +
     '- Sin credito para clientes nuevos.\n' +
     '- Luego de trabajar juntos pueden aplicar. Los precios a credito son distintos.\n\n' +

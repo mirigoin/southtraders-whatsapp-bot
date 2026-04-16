@@ -135,16 +135,48 @@ async function checkNorthtraders(product) {
   }
 }
 
-function buildPrompt() {
+// --- Live prices from Google Sheets ---
+const PRICES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQJnHEwjzr2DODFe50HiG4g1ARBm8kLRFkSj2mP7pI26ymYrN-5q-M4R9S_mhapc0Ip9jQt6ZT9vREd/pub?gid=0&single=true&output=csv';
+let cachedPrices = null;
+let lastPriceFetch = 0;
+
+async function fetchPrices() {
+  const now = Date.now();
+  if (cachedPrices && now - lastPriceFetch < 5 * 60 * 1000) return cachedPrices;
+  try {
+    const resp = await fetch(PRICES_CSV_URL);
+    const text = await resp.text();
+    const lines = text.split('\n').filter(l => l.trim());
+    const prices = [];
+    for (const line of lines.slice(1)) {
+      const cols = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+      const product = (cols[6] || '').replace(/"/g, '').trim();
+      const price = (cols[7] || '').replace(/"/g, '').trim();
+      if (product && price && price !== '/' && !product.startsWith('*')) {
+        prices.push(product + ' ' + price);
+      }
+    }
+    cachedPrices = prices;
+    lastPriceFetch = now;
+    console.log('Prices fetched:', prices.length, 'products');
+    return prices;
+  } catch (e) {
+    console.error('Error fetching prices:', e);
+    return cachedPrices || [];
+  }
+}
+
+async function buildPrompt() {
+  await fetchPrices();
   return 'Sos Sophia, agente comercial de South Traders, distribuidor oficial Apple en Miami.\n\n' +
     'PERSONALIDAD:\n' +
     '- Mujer profesional, segura, con carisma y calidez genuina. Nunca robotica.\n' +
     '- Haces sentir al cliente especial.\n\n' +
     'SALUDO INICIAL:\n' +
-    '- Cuando alguien escribe por primera vez, saludá EXACTAMENTE asi: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n' +
+    '- Cuando alguien escribe por primera vez, saludÃ¡ EXACTAMENTE asi: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n' +
     '- Nunca uses asteriscos para tu nombre ni el de la empresa.\n\n' +
     'SALUDO INICIAL (cuando alguien escribe por primera vez):\n' +
-    'Usá exactamente este formato: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n\n' +
+    'UsÃ¡ exactamente este formato: Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte.\n\n' +
     'EMPRESA:\n' +
     '- Somos distribuidor oficial Apple. Tenemos iPhones, MacBooks, Samsung y accesorios.\n' +
     '- Mayoristas para LATAM, El Caribe y el mundo.\n' +
@@ -164,15 +196,8 @@ function buildPrompt() {
     '- Si preguntan por stock en general o quieren ver todo el stock, manda el link de Pangea.\n' +
     '- Si preguntan PUNTUALMENTE cuantas unidades hay de un modelo especifico (ej: cuantos iPhone 16 tienen), SIEMPRE verifica primero en Northtraders antes de responder. No inventes cantidades.\n' +
     '- Si el stock de Pangea no alcanza para el pedido, busca disponibilidad adicional en Northtraders.\n\n' +
-    'PRECIOS USD (lista cash, clientes nuevos) - Actualizado 08/04:\n' +
-    'iPhone Air 256GB $845 | iPhone 17 256GB $745\n' +
-    'iPhone 17 Pro: 256GB $1,165 | 512GB $1,350\n' +
-    'iPhone 17 Pro Max: 256GB $1,290 | 512GB $1,470 | 1TB $1,670\n' +
-    'iPhone 16 128GB $662 | iPhone 15 128GB $546\n' +
-    'Samsung S26 Ultra 512GB $1,155 | S25 Ultra 512GB $880\n' +
-    'MacBook Air 13" M5 $1,030 | 15" M5 $1,230\n' +
-    'AirPods 4 $100 | AirPods Pro 3 $210\n' +
-    'iPad 11th Gen A16 WiFi 128GB $308 | Apple Watch Ultra 3 $690\n\n' +
+    'PRECIOS USD (Lista Cash Tier 1, clientes nuevos):\n' +
+    (cachedPrices ? cachedPrices.join('\n') : 'Precios no disponibles') + '\n\n' +
     'CREDITO:\n' +
     '- Sin credito para clientes nuevos.\n' +
     '- Luego de trabajar juntos pueden aplicar. Los precios a credito son distintos.\n\n' +
@@ -198,7 +223,7 @@ async function askClaude(phone, userText) {
   try {
     const resp = await axios.post(
       'https://api.anthropic.com/v1/messages',
-      { model: 'claude-haiku-4-5', max_tokens: 1024, system: buildPrompt(), messages: messages },
+      { model: 'claude-haiku-4-5', max_tokens: 1024, system: await buildPrompt(), messages: messages },
       { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 30000 }
     );
     const text = resp.data && resp.data.content && resp.data.content[0] && resp.data.content[0].text;
@@ -253,7 +278,7 @@ async function handleMessage(phone, text) {
   // Detectar si es consulta puntual de stock
   let extraContext = '';
   const textLower = text.toLowerCase();
-  const isStockQuery = (textLower.includes('cuantos') || textLower.includes('cuántos') || 
+  const isStockQuery = (textLower.includes('cuantos') || textLower.includes('cuÃ¡ntos') || 
     textLower.includes('tienen') || textLower.includes('disponible') || 
     textLower.includes('stock') || textLower.includes('hay')) &&
     (textLower.includes('iphone') || textLower.includes('samsung') || 

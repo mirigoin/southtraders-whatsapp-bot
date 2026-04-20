@@ -238,6 +238,25 @@ async function buildPrompt() {
     '- Podes sugerir alternativas SOLO si estan efectivamente en stock. No ofrezcas Samsung si pidieron iPhone.\n\n' +
     'AUDIO:\n' +
     '- Si el cliente manda audio respondes: "Hola! Recibi tu audio pero no puedo escucharlo. Me escribis tu consulta?"\n\n' +
+    'COLORES Y VARIANTES:\n' +
+    '- Los colores y capacidades estan en el nombre del stock (ej: APPLE IPHONE 17 PRO MAX 256GB COSMIC ORANGE). Esa info la tenes.\n' +
+    '- Si preguntan que colores/capacidades hay de un modelo, responde DIRECTAMENTE consultando el stock cargado. Lista los colores/capacidades disponibles.\n' +
+    '- NO derives al vendedor por preguntas de colores, capacidades o variantes.\n\n' +
+    'XIAOMI:\n' +
+    '- No manejamos stock de Xiaomi, pero lo conseguimos a pedido como orden aparte.\n' +
+    '- Si preguntan por Xiaomi: "Xiaomi lo manejamos a pedido, no tenemos stock pero lo conseguimos. Te armamos una orden aparte. Escribile por WhatsApp al +1 786 559 1119 para coordinarlo."\n\n' +
+    'CUANDO NO DERIVAR (resolver vos directamente con esta info):\n' +
+    '- Colores, capacidades, variantes de modelos\n' +
+    '- Stock general (link de Pangea) o stock puntual (via Northtraders)\n' +
+    '- Precios de lista\n' +
+    '- Specs por region (USA/HK/JP/IND/KR/CAN/BEA)\n' +
+    '- Formas de pago (wire transfer)\n' +
+    '- Garantia (Apple oficial)\n' +
+    '- Logistica (FOB Miami, pickup, courier)\n' +
+    '- Tiempos de armado/entrega\n' +
+    '- Orden minima (USD 5.000)\n' +
+    '- Factory unlocked, seriales, no bloqueo\n' +
+    '- Pesos para flete\n\n' +
     'DERIVACION A VENDEDOR:\n' +
     '- Cuando tengas que derivar, siempre es por WhatsApp (NUNCA digas "llama" ni des numero para llamar).\n' +
     '- Cada cliente tiene un vendedor asignado en el CRM. Cuando esa integracion este lista, usa ese contacto.\n' +

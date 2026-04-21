@@ -3,6 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const { Pool } = require('pg');
 require('dotenv').config();
+const PDFDocument = require('pdfkit');
 
 const app = express();
 app.use(express.json());
@@ -402,6 +403,134 @@ async function handleMessage(phone, text) {
     sendWA(OWNER_PHONE, '\uD83D\uDCCB ORDEN PENDIENTE\nCliente: +' + phone + '\n' + reply.slice(0, 500)).catch(function(){});
   }
 }
+
+// ===== DAILY LIST PDF =====
+function buildDailyListData() {
+  // Combinar stock de Pangea con precios del Google Sheet
+  // stockData tiene: {desc, qty, transit}
+  // cachedPrices tiene strings tipo "MODELO DESCRIPCION $PRECIO"
+  const priceMap = {};
+  if (cachedPrices && cachedPrices.length) {
+    for (let i = 0; i < cachedPrices.length; i++) {
+      const line = cachedPrices[i];
+      // Intentar extraer el precio del final de la linea
+      const m = line.match(/^(.+?)\s+(\$[\d.,]+)\s*$/);
+      if (m) {
+        const prod = m[1].trim().toUpperCase();
+        priceMap[prod] = m[2];
+      }
+    }
+  }
+  // Filtrar solo items con stock > 0 y SIN sufijos de refu
+  const items = [];
+  for (let i = 0; i < stockData.length; i++) {
+    const it = stockData[i];
+    if (it.qty <= 0) continue;
+    if (/\s[-]\s*(GA\+?-?|GAB|GB|IND)$/i.test(it.desc)) continue;
+    // Buscar precio por match exacto o parcial
+    let price = priceMap[it.desc.toUpperCase()] || "";
+    if (!price) {
+      // Buscar por inclusion
+      const keys = Object.keys(priceMap);
+      for (let k = 0; k < keys.length; k++) {
+        if (it.desc.toUpperCase().includes(keys[k]) || keys[k].includes(it.desc.toUpperCase())) {
+          price = priceMap[keys[k]];
+          break;
+        }
+      }
+    }
+    items.push({ desc: it.desc, qty: it.qty, price: price || "-" });
+  }
+  // Ordenar alfabeticamente por desc
+  items.sort((a, b) => a.desc.localeCompare(b.desc));
+  return items;
+}
+
+function generateDailyListPDF(res) {
+  const items = buildDailyListData();
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("en-US", { timeZone: "America/New_York", year: "numeric", month: "short", day: "2-digit" });
+  
+  const pdf = new PDFDocument({ size: "A4", margins: { top: 40, bottom: 40, left: 40, right: 40 } });
+  pdf.pipe(res);
+  
+  // Header
+  pdf.fontSize(22).fillColor("#000").text("SOUTH TRADERS", { align: "center" });
+  pdf.fontSize(11).fillColor("#666").text("Distribuidor Oficial Apple - Miami, FL", { align: "center" });
+  pdf.moveDown(0.3);
+  pdf.fontSize(14).fillColor("#000").text("STOCK LIST - " + dateStr, { align: "center" });
+  pdf.moveDown(1);
+  
+  // Table header
+  const tableTop = pdf.y;
+  const col1 = 40;
+  const col2 = 380;
+  const col3 = 455;
+  pdf.fontSize(10).fillColor("#fff");
+  pdf.rect(col1, tableTop, 515, 20).fill("#000");
+  pdf.fillColor("#fff").text("PRODUCT", col1 + 5, tableTop + 6);
+  pdf.text("QTY", col2, tableTop + 6);
+  pdf.text("PRICE USD", col3, tableTop + 6);
+  pdf.moveDown(0.2);
+  pdf.y = tableTop + 25;
+  
+  // Table rows
+  pdf.fontSize(9).fillColor("#000");
+  let rowY = pdf.y;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (rowY > 760) {
+      pdf.addPage();
+      rowY = 40;
+    }
+    // Alternar fondo
+    if (i % 2 === 0) {
+      pdf.rect(col1, rowY - 2, 515, 15).fill("#f5f5f5");
+      pdf.fillColor("#000");
+    }
+    pdf.text(it.desc, col1 + 5, rowY, { width: 330, ellipsis: true });
+    pdf.text(String(it.qty), col2, rowY);
+    pdf.text(it.price, col3, rowY);
+    rowY += 15;
+  }
+  
+  // Footer
+  if (rowY > 720) { pdf.addPage(); rowY = 40; }
+  pdf.moveDown(2);
+  pdf.fontSize(9).fillColor("#666");
+  pdf.text("FOB Miami - Wire transfer in advance - Min. order: USD 5,000", col1, rowY + 20, { align: "center", width: 515 });
+  pdf.text("All products new, sealed, factory unlocked, Apple official warranty", col1, rowY + 35, { align: "center", width: 515 });
+  pdf.text("Prices subject to change - Stock subject to final confirmation", col1, rowY + 50, { align: "center", width: 515 });
+  
+  pdf.end();
+}
+
+app.get("/daily-list.pdf", async function(req, res) {
+  await fetchPrices();
+  res.setHeader("Content-Type", "application/pdf");
+  const today = new Date().toISOString().slice(0,10);
+  res.setHeader("Content-Disposition", "inline; filename=\"south-traders-stock-" + today + ".pdf\"");
+  generateDailyListPDF(res);
+});
+
+app.get("/daily-list.html", async function(req, res) {
+  await fetchPrices();
+  const items = buildDailyListData();
+  const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", year: "numeric", month: "short", day: "2-digit" });
+  let html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>South Traders - Stock " + today + "</title>";
+  html += "<style>body{font-family:Arial,sans-serif;max-width:900px;margin:20px auto;padding:20px}h1{text-align:center;margin:0}h2{text-align:center;color:#666;margin:5px 0 20px}table{width:100%;border-collapse:collapse}th{background:#000;color:#fff;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #eee}tr:nth-child(even){background:#f5f5f5}.footer{text-align:center;color:#666;margin-top:30px;font-size:13px}.btn{display:block;width:200px;margin:20px auto;padding:12px;background:#000;color:#fff;text-align:center;text-decoration:none;border-radius:6px}</style></head><body>";
+  html += "<h1>SOUTH TRADERS</h1><h2>Distribuidor Oficial Apple - Miami, FL</h2>";
+  html += "<h2>STOCK LIST - " + today + "</h2>";
+  html += "<a class=\"btn\" href=\"/daily-list.pdf\">Descargar PDF</a>";
+  html += "<table><thead><tr><th>Product</th><th>Qty</th><th>Price USD</th></tr></thead><tbody>";
+  for (let i = 0; i < items.length; i++) {
+    html += "<tr><td>" + items[i].desc + "</td><td>" + items[i].qty + "</td><td>" + items[i].price + "</td></tr>";
+  }
+  html += "</tbody></table>";
+  html += "<div class=\"footer\">FOB Miami - Wire transfer in advance - Min. order: USD 5,000<br>All products new, sealed, factory unlocked, Apple official warranty<br>Prices subject to change - Stock subject to final confirmation</div>";
+  html += "</body></html>";
+  res.send(html);
+});
 
 // WEBHOOK
 app.get('/webhook', function(req, res) {

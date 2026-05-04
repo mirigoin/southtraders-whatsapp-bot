@@ -415,10 +415,10 @@ async function loadConversations(){
     try{
         const r = await fetch('/conversations').then(r=>r.json());
         const byPhone = {};
-        (r.rows || r || []).forEach(m => {
-            if (!byPhone[m.phone]) byPhone[m.phone] = [];
-            byPhone[m.phone].push(m);
-        });
+                Object.entries(r.conversations || {}).forEach(([phone, conv]) => (conv.messages || []).forEach(m => {
+                        if (!byPhone[phone]) byPhone[phone] = [];
+                        byPhone[phone].push({...m, phone});
+                }));
         const list = Object.entries(byPhone)
             .map(([phone, msgs]) => ({phone, count: msgs.length, last: msgs[msgs.length-1]}))
             .sort((a,b) => new Date(b.last.ts) - new Date(a.last.ts))

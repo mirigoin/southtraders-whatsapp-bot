@@ -12,7 +12,7 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const OWNER_PHONE = process.env.OWNER_PHONE || '17865591119';
+const OWNER_PHONES = (process.env.OWNER_PHONES || '17865591119,5491167581084').split(',').map(function(p){ return p.trim(); });
 const DATABASE_URL = process.env.DATABASE_URL;
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL ? { rejectUnauthorized: false } : false });
@@ -254,7 +254,7 @@ async function buildPrompt() {
     '- NO derives al vendedor por preguntas de colores, capacidades o variantes.\n\n' +
     'XIAOMI:\n' +
     '- No manejamos stock de Xiaomi, pero lo conseguimos a pedido como orden aparte.\n' +
-    '- Si preguntan por Xiaomi: "Xiaomi lo manejamos a pedido, no tenemos stock pero lo conseguimos. Te armamos una orden aparte. Escribile por WhatsApp al +1 786 559 1119 para coordinarlo."\n\n' +
+    '- Si preguntan por Xiaomi: "Xiaomi lo manejamos a pedido, no tenemos stock pero lo conseguimos. Te armamos una orden aparte. Escribile por WhatsApp al https://wa.me/5491167581084 para coordinarlo."\n\n' +
     'CUANDO NO DERIVAR (resolver vos directamente con esta info):\n' +
     '- Colores, capacidades, variantes de modelos\n' +
     '- Stock general (link de Pangea) o stock puntual (via Northtraders)\n' +
@@ -270,7 +270,7 @@ async function buildPrompt() {
     'DERIVACION A VENDEDOR:\n' +
     '- Cuando tengas que derivar, siempre es por WhatsApp (NUNCA digas "llama" ni des numero para llamar).\n' +
     '- Cada cliente tiene un vendedor asignado en el CRM. Cuando esa integracion este lista, usa ese contacto.\n' +
-    '- Fallback actual (hasta que CRM este integrado): "Escribile por WhatsApp al +1 786 559 1119 y te atienden enseguida."\n' +
+    '- Fallback actual (hasta que CRM este integrado): "Escribile por WhatsApp al https://wa.me/5491167581084 y te atienden enseguida."\n' +
     '- NO derives "por cualquier cosa". Resolve todo lo que puedas con estos parametros. Derivar es excepcion.\n\n' +
     'INTENCION DE COMPRA / PROFORMA / CIERRE:\n' +
     '- Cuando el cliente dice una cantidad especifica, confirma que quiere comprar, pide proforma/invoice/sales order, o dice "dame X", "quiero X", "confirmo": NO cierres la venta. NO digas "listo" ni "confirmado" ni "te genero el sales order".\n' +
@@ -283,13 +283,13 @@ async function buildPrompt() {
     '  "- Total estimado: USD [total] (sujeto a confirmacion)\\n" +\n' +
     '  "- Pago: Wire transfer in advance\\n" +\n' +
     '  "- Logistica: FOB Miami\\n\\n" +\n' +
-    '  "Escribile por WhatsApp al +1 786 559 1119 para que confirme disponibilidad real y te mande el sales order."\n' +
+    '  "Escribile por WhatsApp al https://wa.me/5491167581084 para que confirme disponibilidad real y te mande el sales order."\n' +
     '- IMPORTANTE: usa las palabras "referencia", "estimado", "sujeto a confirmacion". Nunca presentes el pedido como cerrado.\n' +
     '- El cliente NO tiene la orden confirmada hasta que el vendedor verifique stock real y emita el sales order formal.\n\n' +
     'KYC (ALTA DE CLIENTE):\n' +
     '- Podes cotizar, hablar de productos, dar precios de referencia, armar RESUMEN DE INTERES y derivar al vendedor. Eso esta permitido sin KYC previo.\n' +
     '- Cuando el cliente muestra intencion CONCRETA de avanzar (pide proforma/sales order/invoice, dice "confirmo/cerremos/dale/cuando me la pasas/cuando puedo pagar", pide datos bancarios o numero de cuenta, pregunta "que sigue" o "cual es el paso"), ademas de armar el RESUMEN DE INTERES, agrega al FINAL del mensaje esta nota exacta:\n\n' +
-    '  "Una aclaracion importante: para avanzar con la operacion y recibir el sales order con datos de pago, necesitas estar dado de alta como cliente. Es un alta rapida con datos de tu empresa para operar legalmente. Cuando te contactes con el vendedor al +1 786 559 1119, el te va a pasar el formulario de alta."\n\n' +
+    '  "Una aclaracion importante: para avanzar con la operacion y recibir el sales order con datos de pago, necesitas estar dado de alta como cliente. Es un alta rapida con los datos de tu empresa. Podes hacerlo en https://kyc.south-traders.com y cuando termines, escribile a Nico al https://wa.me/5491167581084 para que confirme stock y te pase el sales order formal."\n\n' +
     '- NO le pidas el KYC al cliente nuevo de entrada, no lo cortes antes de tiempo. Primero dejalo consultar, cotizar, entender el producto.\n' +
     '- NUNCA des datos bancarios ni compartas sales order formal. Eso lo hace el vendedor una vez que el KYC esta aprobado.\n' +
     '- NUNCA digas "tenes que hacer el KYC" antes de que el cliente muestre intencion de comprar. Ser agresivo con el KYC espanta leads.\n\n' +
@@ -363,7 +363,7 @@ async function handleMessage(phone, text) {
     const greeting = 'Bienvenido/a a South Traders, distribuidor oficial Apple en Miami. Soy Sophia y estoy aqui para ayudarte \uD83D\uDE0A';
     await sendWA(phone, greeting);
     await saveMessage(phone, 'assistant', greeting);
-    sendWA(OWNER_PHONE, '\uD83D\uDD14 Nuevo cliente\nDe: +' + phone + '\n"' + text.slice(0,80) + '"').catch(function(){});
+    OWNER_PHONES.forEach(function(_p){ sendWA(_p, '\uD83D\uDD14 Nuevo cliente\nDe: +' + phone + '\n"' + text.slice(0,80) + '"').catch(function(){}); });
     // Ahora procesar su mensaje inicial con Claude (sin el saludo en el historial aun)
   }
 
@@ -391,7 +391,7 @@ async function handleMessage(phone, text) {
 
   const reply = await askClaude(phone, text + extraContext);
   if (!reply) {
-    await sendWA(phone, 'Disculpa la demora! Escribinos por WhatsApp al +1 786 559 1119 y te atendemos enseguida');
+    await sendWA(phone, 'Disculpa la demora! Escribinos por WhatsApp al https://wa.me/5491167581084 y te atendemos enseguida');
     return;
   }
   await sendWA(phone, reply);
@@ -399,8 +399,8 @@ async function handleMessage(phone, text) {
 
   // Notificar si hay proforma
   const isProforma = reply.toLowerCase().includes('proforma') || reply.toLowerCase().includes('wire transfer') || reply.toLowerCase().includes('total usd');
-  if (isProforma && phone !== OWNER_PHONE) {
-    sendWA(OWNER_PHONE, '\uD83D\uDCCB ORDEN PENDIENTE\nCliente: +' + phone + '\n' + reply.slice(0, 500)).catch(function(){});
+  if (isProforma && !OWNER_PHONES.includes(phone)) {
+    OWNER_PHONES.forEach(function(_p){ sendWA(_p, '\uD83D\uDCCB ORDEN PENDIENTE\nCliente: +' + phone + '\n' + reply.slice(0, 500)).catch(function(){}); });
   }
 }
 

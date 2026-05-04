@@ -4,6 +4,7 @@ const axios = require('axios');
 const { Pool } = require('pg');
 require('dotenv').config();
 const PDFDocument = require('pdfkit');
+const setupDashboardRoutes = require('./dashboard-routes');
 
 const app = express();
 app.use(express.json());
@@ -16,6 +17,7 @@ const OWNER_PHONES = (process.env.OWNER_PHONES || '17865591119,5491167581084').s
 const DATABASE_URL = process.env.DATABASE_URL;
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: DATABASE_URL ? { rejectUnauthorized: false } : false });
+setupDashboardRoutes(app, pool);
 
 async function initDB() {
   await pool.query('CREATE TABLE IF NOT EXISTS conversations (phone TEXT, role TEXT, content TEXT, ts TIMESTAMPTZ DEFAULT NOW())');

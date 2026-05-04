@@ -618,6 +618,21 @@ app.post('/crm/contacts', async function(req, res) {
 });
 
 // LEGAL
+app.get('/test-nico', async function(req, res) {
+  const target = req.query.to || '5491167581084';
+  try {
+    const r = await fetch('https://graph.facebook.com/v19.0/' + PHONE_NUMBER_ID + '/messages', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + WHATSAPP_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: target, type: 'text', text: { body: 'Test desde Sofia - ignorar' } })
+    });
+    const data = await r.json();
+    res.json({ status: r.status, sent_to: target, response: data });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/privacy', function(req, res) { res.send('<h1>Privacy Policy</h1><p>South Traders Bot collects phone numbers and messages to provide wholesale sales assistance. Data is never sold. Contact: sales@south-traders.com</p>'); });
 app.get('/terms', function(req, res) { res.send('<h1>Terms of Service</h1><p>By messaging this bot you agree to receive wholesale electronics information. Contact: sales@south-traders.com</p>'); });
 

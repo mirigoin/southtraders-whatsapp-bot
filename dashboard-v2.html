@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>South Traders — Dashboard v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;font-size:14px}
+header{background:#1a1a2e;color:white;padding:14px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+header h1{font-size:18px;font-weight:600;flex:1}
+.dot{width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.user{font-size:12px;opacity:.7}
+.tabs{background:white;border-bottom:1px solid #e0e0e0;padding:0 24px;display:flex;gap:4px;position:sticky;top:0;z-index:10}
+.tab{padding:14px 20px;cursor:pointer;border-bottom:3px solid transparent;font-weight:500;color:#666;transition:all .15s}
+.tab:hover{color:#1a1a2e}
+.tab.active{color:#1a1a2e;border-bottom-color:#22c55e}
+.tab .badge{background:#1a1a2e;color:white;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:6px}
+main{max-width:1200px;margin:0 auto;padding:20px}
+.panel{display:none;background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.panel.active{display:block}
+h2{font-size:16px;font-weight:600;margin-bottom:14px;color:#1a1a2e}
+h3{font-size:13px;font-weight:600;margin:12px 0 8px;color:#555;text-transform:uppercase;letter-spacing:.5px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+input,select,textarea{font-family:inherit;font-size:13px;padding:8px 12px;border:1px solid #ddd;border-radius:7px;flex:1;min-width:140px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a2e}
+textarea{min-height:60px;resize:vertical}
+.btn{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-primary{background:#1a1a2e;color:white}
+.btn-primary:hover{background:#2d2d4e}
+.btn-success{background:#22c55e;color:white}
+.btn-success:hover{background:#16a34a}
+.btn-danger{background:#ef4444;color:white}
+.btn-warning{background:#f59e0b;color:white}
+.btn-ghost{background:transparent;color:#666;border:1px solid #ddd}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px}
+.stat .n{font-size:24px;font-weight:700;color:#1a1a2e}
+.stat .l{font-size:11px;color:#777;margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+table th{text-align:left;padding:10px 8px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-weight:600;font-size:11px;text-transform:uppercase;color:#666}
+table td{padding:10px 8px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+table tr:hover{background:#fafbfc}
+.cell-edit{cursor:pointer;border-bottom:1px dashed transparent;padding:2px 4px;border-radius:4px}
+.cell-edit:hover{border-bottom-color:#1a1a2e;background:#f9fafb}
+.cell-edit.empty{color:#bbb;font-style:italic}
+.contact-input{padding:4px 6px;border:1px solid #1a1a2e;border-radius:4px;font-size:13px;width:100%}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.tag-active{background:#dcfce7;color:#166534}
+.tag-cold{background:#fef3c7;color:#92400e}
+.tag-vip{background:#ddd6fe;color:#5b21b6}
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:white;padding:12px 18px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:all .25s;font-size:13px;z-index:1000;max-width:340px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.error{background:#dc2626}
+.toast.success{background:#16a34a}
+.dropzone{border:2px dashed #d1d5db;border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:all .15s;background:#fafbfc}
+.dropzone:hover{border-color:#1a1a2e;background:#f0f2f5}
+.dropzone.over{border-color:#22c55e;background:#dcfce7}
+.dropzone input[type=file]{display:none}
+.preview-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-top:14px}
+.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.preview-stat{background:white;border-radius:6px;padding:10px;text-align:center}
+.preview-stat .n{font-size:20px;font-weight:700}
+.preview-stat .n.green{color:#16a34a}
+.preview-stat .n.red{color:#dc2626}
+.preview-stat .n.amber{color:#d97706}
+.preview-stat .l{font-size:11px;color:#777;margin-top:2px}
+.steps{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #e5e7eb}
+.step{flex:1;padding:12px;text-align:center;font-size:12px;color:#999;border-bottom:3px solid transparent;cursor:default}
+.step.active{color:#1a1a2e;font-weight:600;border-bottom-color:#22c55e}
+.step.done{color:#16a34a}
+.step .num{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:#e5e7eb;color:#777;margin-right:6px;font-weight:700}
+.step.active .num{background:#1a1a2e;color:white}
+.step.done .num{background:#16a34a;color:white}
+.template-card{border:1px solid #e5e7eb;border-radius:8px;padding:14px;cursor:pointer;transition:all .15s}
+.template-card:hover{border-color:#1a1a2e}
+.template-card.selected{border-color:#22c55e;background:#dcfce7}
+.template-card .name{font-weight:600;margin-bottom:4px}
+.template-card .meta{font-size:11px;color:#777;margin-bottom:6px}
+.template-card .body{font-size:12px;color:#555;background:white;padding:8px;border-radius:5px;border:1px solid #f0f0f0}
+.empty-state{text-align:center;padding:40px;color:#999}
+.progress-bar{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
+.progress-bar .fill{height:100%;background:#22c55e;transition:width .3s}
+.muted{color:#777;font-size:12px}
+@media(max-width:700px){
+.stats{grid-template-columns:repeat(2,1fr)}
+.preview-grid{grid-template-columns:repeat(2,1fr)}
+.tabs{padding:0 12px;overflow-x:auto}
+.tab{white-space:nowrap}
+}
+</style>
+</head>
+<body>
+
+<header>
+    <span class="dot"></span>
+    <h1>South Traders — Sophia Dashboard v2</h1>
+    <span class="user" id="now">--:--</span>
+</header>
+
+<nav class="tabs">
+    <div class="tab active" data-tab="overview">📊 Resumen</div>
+    <div class="tab" data-tab="contacts">👥 Contactos <span class="badge" id="badge-contacts">--</span></div>
+    <div class="tab" data-tab="conversations">💬 Conversaciones</div>
+    <div class="tab" data-tab="campaign-new">📤 Nueva campaña</div>
+    <div class="tab" data-tab="campaigns">📈 Campañas <span class="badge" id="badge-campaigns">--</span></div>
+</nav>
+
+<main>
+
+<!-- ====== OVERVIEW ====== -->
+<section class="panel active" id="panel-overview">
+    <h2>Vista general</h2>
+    <div class="stats">
+        <div class="stat"><div class="n" id="kpi-contacts">--</div><div class="l">Contactos</div></div>
+        <div class="stat"><div class="n" id="kpi-messages">--</div><div class="l">Mensajes (todos)</div></div>
+        <div class="stat"><div class="n" id="kpi-active">--</div><div class="l">Activos hoy</div></div>
+        <div class="stat"><div class="n" id="kpi-campaigns">--</div><div class="l">Campañas</div></div>
+    </div>
+    <h3>Últimas conversaciones</h3>
+    <div id="recent-conv" class="muted">Cargando...</div>
+</section>
+
+<!-- ====== CONTACTS ====== -->
+<section class="panel" id="panel-contacts">
+    <h2>Contactos <span class="muted" style="font-weight:400">(click en cualquier celda para editar)</span></h2>
+    <div class="row" style="margin-bottom:14px">
+        <input type="search" id="contact-search" placeholder="Buscar por nombre, teléfono o empresa...">
+        <select id="contact-filter-tier" style="flex:0 0 auto">
+            <option value="">Todos los tiers</option>
+            <option value="vip">VIP</option>
+            <option value="hot">Hot</option>
+            <option value="warm">Warm</option>
+            <option value="cold">Cold</option>
+        </select>
+    </div>
+    <div style="overflow-x:auto">
+        <table id="contacts-table">
+            <thead>
+                <tr>
+                    <th>Teléfono</th>
+                    <th>Nombre</th>
+                    <th>Empresa</th>
+                    <th>País</th>
+                    <th>Tier</th>
+                    <th>Status</th>
+                    <th>Mensajes</th>
+                    <th>Notas</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ====== CONVERSATIONS ====== -->
+<section class="panel" id="panel-conversations">
+    <h2>Conversaciones recientes</h2>
+    <p class="muted">Para gestionar conversaciones (pausar/borrar/enviar) usá el dashboard original en <a href="/dashboard">/dashboard</a>.</p>
+    <div id="conv-list" style="margin-top:14px"></div>
+</section>
+
+<!-- ====== NEW CAMPAIGN (4 STEPS) ====== -->
+<section class="panel" id="panel-campaign-new">
+    <h2>Nueva campaña de outbound</h2>
+
+    <div class="steps">
+        <div class="step active" data-step="1"><span class="num">1</span>Subir lista</div>
+        <div class="step" data-step="2"><span class="num">2</span>Elegir template</div>
+        <div class="step" data-step="3"><span class="num">3</span>Preview</div>
+        <div class="step" data-step="4"><span class="num">4</span>Confirmar y enviar</div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step-panel" data-stepp="1">
+        <h3>1. Subir lista de clientes (CSV)</h3>
+        <p class="muted">Columnas esperadas: <code>phone, name</code> (opcional: <code>company, country</code>). Tamaño máximo 2MB.</p>
+        <div class="dropzone" id="dropzone">
+            <input type="file" id="csv-file" accept=".csv,text/csv">
+            <p>📁 Arrastrá un CSV acá o <strong>click para elegir archivo</strong></p>
+            <p class="muted" style="margin-top:6px">El sistema valida números, detecta duplicados y los marca como skipped.</p>
+        </div>
+        <div id="upload-result" style="display:none"></div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step-panel" data-stepp="2" style="display:none">
+        <h3>2. Elegir template aprobado de Meta</h3>
+        <div id="templates-list" class="muted">Cargando templates...</div>
+        <div class="row" style="margin-top:14px">
+            <button class="btn btn-ghost" onclick="goStep(1)">← Atrás</button>
+            <button class="btn btn-primary" id="step2-next" onclick="goStep(3)" disabled>Siguiente →</button>
+        </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step-panel" data-stepp="3" style="display:none">
+        <h3>3. Preview de la campaña</h3>
+        <div class="row">
+            <input type="text" id="campaign-name" placeholder="Nombre de la campaña (ej: Promo iPhone Mayo 2026)">
+        </div>
+        <div id="preview-content"></div>
+        <div class="row" style="margin-top:14px">
+            <button class="btn btn-ghost" onclick="goStep(2)">← Atrás</button>
+            <button class="btn btn-primary" onclick="goStep(4)">Siguiente →</button>
+        </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step-panel" data-stepp="4" style="display:none">
+        <h3>4. Confirmar envío</h3>
+        <div class="preview-box">
+            <p><strong>⚠️ Atención:</strong> al confirmar, el sistema empezará a mandar mensajes a una velocidad de <strong>1 mensaje cada 10 segundos</strong>.</p>
+            <p class="muted" style="margin-top:6px">No se puede pausar una vez iniciado. Si Meta detecta abuso, baja la calidad del WABA o suspende el número.</p>
+            <p style="margin-top:10px" id="confirm-summary"></p>
+        </div>
+        <div class="row" style="margin-top:14px">
+            <button class="btn btn-ghost" onclick="goStep(3)">← Atrás</button>
+            <button class="btn btn-success" id="confirm-send" onclick="launchCampaign()">🚀 SÍ, ENVIAR AHORA</button>
+        </div>
+        <div id="campaign-result" style="margin-top:20px"></div>
+    </div>
+</section>
+
+<!-- ====== CAMPAIGNS HISTORY ====== -->
+<section class="panel" id="panel-campaigns">
+    <h2>Historial de campañas</h2>
+    <div id="campaigns-list" class="muted">Cargando...</div>
+</section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+    contacts: [],
+    templates: [],
+    selectedTemplate: null,
+    uploadedContacts: null,   // {valid, invalid, duplicates}
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function $(s){return document.querySelector(s)}
+function $$(s){return [...document.querySelectorAll(s)]}
+function toast(msg, type='info'){
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + type;
+    setTimeout(()=>t.className='toast', 3500);
+}
+async function api(method, url, body){
+    const opts = { method, headers: {} };
+    if (body && !(body instanceof FormData)){
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+    } else if (body instanceof FormData){
+        opts.body = body;
+    }
+    const res = await fetch(url, opts);
+    const data = await res.json().catch(()=>({ok:false,error:'respuesta no JSON'}));
+    if (!res.ok || !data.ok){
+        throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return data;
+}
+function escapeHtml(s){
+    if (s==null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============================================================
+// TABS
+// ============================================================
+$$('.tab').forEach(tab => tab.addEventListener('click', () => {
+    $$('.tab').forEach(t => t.classList.remove('active'));
+    $$('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panelId = 'panel-' + tab.dataset.tab;
+    $('#' + panelId).classList.add('active');
+    if (tab.dataset.tab === 'contacts') loadContacts();
+    if (tab.dataset.tab === 'overview') loadOverview();
+    if (tab.dataset.tab === 'campaigns') loadCampaigns();
+    if (tab.dataset.tab === 'conversations') loadConversations();
+}));
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+async function loadOverview(){
+    try{
+        const [contacts, campaigns] = await Promise.all([
+            api('GET', '/crm/contacts/full'),
+            api('GET', '/campaigns')
+        ]);
+        $('#kpi-contacts').textContent = contacts.contacts.length;
+        $('#badge-contacts').textContent = contacts.contacts.length;
+        const totalMsgs = contacts.contacts.reduce((a,c)=>a+parseInt(c.msg_count||0,10),0);
+        $('#kpi-messages').textContent = totalMsgs;
+        const today = new Date().toISOString().slice(0,10);
+        const activeToday = contacts.contacts.filter(c => c.last_msg_ts && c.last_msg_ts.startsWith(today)).length;
+        $('#kpi-active').textContent = activeToday;
+        $('#kpi-campaigns').textContent = campaigns.campaigns.length;
+        $('#badge-campaigns').textContent = campaigns.campaigns.length;
+
+        // Recent
+        const recent = contacts.contacts.filter(c=>c.last_msg_ts).slice(0,5);
+        $('#recent-conv').innerHTML = recent.length
+            ? recent.map(c => `
+                <div style="padding:10px;border-bottom:1px solid #f0f0f0">
+                    <strong>${escapeHtml(c.name||c.phone)}</strong>
+                    <span class="muted">— ${c.msg_count} mensajes — última actividad: ${new Date(c.last_msg_ts).toLocaleString('es-AR')}</span>
+                </div>`).join('')
+            : '<p class="empty-state">Sin actividad reciente</p>';
+    } catch(e){
+        toast('Error cargando overview: '+e.message, 'error');
+    }
+}
+
+// ============================================================
+// CONTACTS
+// ============================================================
+async function loadContacts(){
+    try{
+        const r = await api('GET', '/crm/contacts/full');
+        state.contacts = r.contacts;
+        renderContacts();
+    } catch(e){
+        toast('Error: '+e.message, 'error');
+    }
+}
+$('#contact-search').addEventListener('input', renderContacts);
+$('#contact-filter-tier').addEventListener('change', renderContacts);
+
+function renderContacts(){
+    const q = ($('#contact-search').value||'').toLowerCase();
+    const tier = $('#contact-filter-tier').value;
+    const filtered = state.contacts.filter(c => {
+        if (tier && c.tier !== tier) return false;
+        if (!q) return true;
+        return (c.phone||'').includes(q) || (c.name||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q);
+    });
+    const tbody = $('#contacts-table tbody');
+    if (!filtered.length){
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Sin contactos</td></tr>';
+        return;
+    }
+    tbody.innerHTML = filtered.map(c => `
+        <tr data-phone="${escapeHtml(c.phone)}">
+            <td>+${escapeHtml(c.phone)}</td>
+            <td><span class="cell-edit ${!c.name?'empty':''}" data-field="name">${escapeHtml(c.name) || 'sin nombre'}</span></td>
+            <td><span class="cell-edit ${!c.company?'empty':''}" data-field="company">${escapeHtml(c.company) || '—'}</span></td>
+            <td><span class="cell-edit ${!c.country?'empty':''}" data-field="country">${escapeHtml(c.country) || '—'}</span></td>
+            <td><span class="cell-edit" data-field="tier">${c.tier ? `<span class="tag tag-${c.tier}">${escapeHtml(c.tier)}</span>` : '<span class="muted">—</span>'}</span></td>
+            <td><span class="cell-edit" data-field="status">${c.status ? `<span class="tag tag-${c.status==='active'?'active':'cold'}">${escapeHtml(c.status)}</span>` : '<span class="muted">—</span>'}</span></td>
+            <td>${c.msg_count||0}</td>
+            <td><span class="cell-edit ${!c.notes?'empty':''}" data-field="notes" style="max-width:200px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.notes) || '—'}</span></td>
+        </tr>
+    `).join('');
+}
+
+// Click-to-edit
+document.addEventListener('click', async (e) => {
+    if (!e.target.classList.contains('cell-edit')) return;
+    const span = e.target;
+    if (span.querySelector('input')) return;
+    const tr = span.closest('tr');
+    const phone = tr.dataset.phone;
+    const field = span.dataset.field;
+    const contact = state.contacts.find(c => c.phone === phone);
+    const currentVal = contact[field] || '';
+
+    const input = document.createElement('input');
+    input.value = currentVal;
+    input.className = 'contact-input';
+    span.innerHTML = '';
+    span.appendChild(input);
+    input.focus();
+    input.select();
+
+    const save = async () => {
+        const newVal = input.value.trim();
+        if (newVal === currentVal){
+            renderContacts();
+            return;
+        }
+        try{
+            await api('PATCH', `/crm/contacts/${phone}`, { [field]: newVal });
+            contact[field] = newVal;
+            toast('Guardado', 'success');
+            renderContacts();
+        } catch(err){
+            toast('Error guardando: '+err.message, 'error');
+            renderContacts();
+        }
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') input.blur();
+        if (ev.key === 'Escape') renderContacts();
+    });
+});
+
+// ============================================================
+// CONVERSATIONS (preview)
+// ============================================================
+async function loadConversations(){
+    try{
+        const r = await fetch('/conversations').then(r=>r.json());
+        const byPhone = {};
+        (r.rows || r || []).forEach(m => {
+            if (!byPhone[m.phone]) byPhone[m.phone] = [];
+            byPhone[m.phone].push(m);
+        });
+        const list = Object.entries(byPhone)
+            .map(([phone, msgs]) => ({phone, count: msgs.length, last: msgs[msgs.length-1]}))
+            .sort((a,b) => new Date(b.last.ts) - new Date(a.last.ts))
+            .slice(0,20);
+        $('#conv-list').innerHTML = list.map(c => `
+            <div style="padding:12px;border-bottom:1px solid #f0f0f0">
+                <strong>+${escapeHtml(c.phone)}</strong>
+                <span class="muted"> · ${c.count} mensajes · ${new Date(c.last.ts).toLocaleString('es-AR')}</span>
+                <div class="muted" style="margin-top:4px;max-width:600px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.last.content || '').substring(0,150)}</div>
+            </div>`).join('') || '<p class="empty-state">Sin conversaciones</p>';
+    } catch(e){
+        $('#conv-list').innerHTML = '<p class="empty-state">Error cargando: '+e.message+'</p>';
+    }
+}
+
+// ============================================================
+// NEW CAMPAIGN — STEPS
+// ============================================================
+let currentStep = 1;
+function goStep(n){
+    currentStep = n;
+    $$('.step').forEach(s => {
+        const sn = parseInt(s.dataset.step,10);
+        s.classList.toggle('active', sn === n);
+        s.classList.toggle('done', sn < n);
+    });
+    $$('.step-panel').forEach(p => {
+        p.style.display = parseInt(p.dataset.stepp,10) === n ? 'block' : 'none';
+    });
+    if (n === 2 && state.templates.length === 0) loadTemplates();
+    if (n === 3) renderPreview();
+    if (n === 4) renderConfirm();
+}
+
+// Step 1: upload
+const dz = $('#dropzone');
+dz.addEventListener('click', () => $('#csv-file').click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('over');
+    if (e.dataTransfer.files.length) handleCsv(e.dataTransfer.files[0]);
+});
+$('#csv-file').addEventListener('change', e => {
+    if (e.target.files.length) handleCsv(e.target.files[0]);
+});
+
+async function handleCsv(file){
+    if (!file.name.match(/\.csv$/i)){
+        toast('Solo archivos .csv', 'error');
+        return;
+    }
+    const fd = new FormData();
+    fd.append('file', file);
+    try{
+        const r = await api('POST', '/upload-contacts', fd);
+        state.uploadedContacts = r;
+        const html = `
+            <div class="preview-box">
+                <div class="preview-grid">
+                    <div class="preview-stat"><div class="n green">${r.stats.valid}</div><div class="l">Válidos</div></div>
+                    <div class="preview-stat"><div class="n amber">${r.stats.duplicates}</div><div class="l">Duplicados (skipped)</div></div>
+                    <div class="preview-stat"><div class="n red">${r.stats.invalid}</div><div class="l">Inválidos</div></div>
+                </div>
+                ${r.invalid.length ? `<details><summary class="muted">Ver inválidos</summary><pre style="font-size:11px;background:white;padding:8px;border-radius:4px;margin-top:6px">${escapeHtml(JSON.stringify(r.invalid.slice(0,20), null, 2))}</pre></details>` : ''}
+                ${r.duplicates.length ? `<details style="margin-top:6px"><summary class="muted">Ver duplicados</summary><pre style="font-size:11px;background:white;padding:8px;border-radius:4px;margin-top:6px">${escapeHtml(JSON.stringify(r.duplicates.slice(0,20), null, 2))}</pre></details>` : ''}
+                ${r.stats.valid ? `<button class="btn btn-primary" style="margin-top:14px" onclick="goStep(2)">Continuar con ${r.stats.valid} contactos →</button>` : '<p class="muted" style="margin-top:14px">No hay contactos válidos para enviar.</p>'}
+            </div>`;
+        $('#upload-result').style.display = 'block';
+        $('#upload-result').innerHTML = html;
+    } catch(e){
+        toast('Error: '+e.message, 'error');
+    }
+}
+
+// Step 2: templates
+async function loadTemplates(){
+    try{
+        const r = await api('GET', '/templates');
+        state.templates = r.templates;
+        const list = $('#templates-list');
+        if (!r.templates.length){
+            list.innerHTML = '<p class="empty-state">No hay templates aprobados</p>';
+            return;
+        }
+        list.innerHTML = r.templates.map((t,i) => {
+            const body = (t.components||[]).find(c => c.type === 'BODY')?.text || '(sin body)';
+            return `<div class="template-card" data-idx="${i}">
+                <div class="name">${escapeHtml(t.name)}</div>
+                <div class="meta">${escapeHtml(t.language)} · ${escapeHtml(t.category)} · ${escapeHtml(t.status)}</div>
+                <div class="body">${escapeHtml(body)}</div>
+            </div>`;
+        }).join('');
+        $$('.template-card').forEach(card => card.addEventListener('click', () => {
+            $$('.template-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            state.selectedTemplate = state.templates[parseInt(card.dataset.idx,10)];
+            $('#step2-next').disabled = false;
+        }));
+    } catch(e){
+        $('#templates-list').innerHTML = '<p class="empty-state">Error: '+escapeHtml(e.message)+'</p>';
+    }
+}
+
+// Step 3: preview
+function renderPreview(){
+    const c = state.uploadedContacts;
+    const t = state.selectedTemplate;
+    if (!c || !t){ goStep(1); return; }
+    const body = (t.components||[]).find(x => x.type === 'BODY')?.text || '';
+    const sample = c.valid[0] || {phone:'?', name:'Cliente'};
+    const sampleRendered = body
+        .replace(/\{\{1\}\}/g, sample.name || 'Cliente')
+        .replace(/\{\{2\}\}/g, sample.company || '');
+    $('#preview-content').innerHTML = `
+        <div class="preview-box">
+            <p><strong>Template:</strong> ${escapeHtml(t.name)} (${escapeHtml(t.language)})</p>
+            <p><strong>Destinatarios:</strong> ${c.valid.length} contactos</p>
+            <p><strong>Tiempo estimado:</strong> ~${Math.ceil(c.valid.length * 10 / 60)} minutos (1 msg cada 10s)</p>
+            <h3 style="margin-top:14px">Preview del primer mensaje (a +${escapeHtml(sample.phone)}):</h3>
+            <div style="background:#dcfce7;padding:14px;border-radius:8px;margin-top:8px;white-space:pre-wrap">${escapeHtml(sampleRendered)}</div>
+        </div>`;
+}
+
+// Step 4: confirm
+function renderConfirm(){
+    const c = state.uploadedContacts;
+    const t = state.selectedTemplate;
+    const name = $('#campaign-name').value.trim() || `Campaña ${new Date().toISOString().slice(0,16)}`;
+    $('#confirm-summary').innerHTML = `
+        <strong>Campaña:</strong> ${escapeHtml(name)}<br>
+        <strong>Template:</strong> ${escapeHtml(t.name)}<br>
+        <strong>Total:</strong> ${c.valid.length} mensajes<br>
+        <strong>Duración:</strong> ~${Math.ceil(c.valid.length * 10 / 60)} minutos
+    `;
+}
+
+async function launchCampaign(){
+    const c = state.uploadedContacts;
+    const t = state.selectedTemplate;
+    const name = $('#campaign-name').value.trim() || `Campaña ${new Date().toISOString().slice(0,16)}`;
+    const btn = $('#confirm-send');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    try{
+        const r = await api('POST', '/campaigns', {
+            name,
+            templateName: t.name,
+            languageCode: t.language,
+            variables: ['{{NAME}}'],   // variable 1 = nombre del contacto
+            contacts: c.valid,
+            confirm: true
+        });
+        $('#campaign-result').innerHTML = `
+            <div class="preview-box" style="background:#dcfce7;border-color:#16a34a">
+                <h3>✅ Campaña iniciada (ID ${r.campaignId})</h3>
+                <p>Se están enviando ${r.queued} mensajes. Tiempo estimado: ${Math.ceil(r.estimatedSeconds/60)} minutos.</p>
+                <p><a href="/dashboard/v2#campaigns" onclick="$$('.tab[data-tab=campaigns]')[0].click();return false;">Ver progreso en pestaña Campañas →</a></p>
+            </div>`;
+        toast('Campaña iniciada', 'success');
+    } catch(e){
+        toast('Error: '+e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '🚀 SÍ, ENVIAR AHORA';
+    }
+}
+
+// ============================================================
+// CAMPAIGNS HISTORY
+// ============================================================
+async function loadCampaigns(){
+    try{
+        const r = await api('GET', '/campaigns');
+        if (!r.campaigns.length){
+            $('#campaigns-list').innerHTML = '<p class="empty-state">Aún no hay campañas. Creá la primera en "Nueva campaña".</p>';
+            return;
+        }
+        $('#campaigns-list').innerHTML = r.campaigns.map(c => {
+            const total = parseInt(c.actually_sent||0,10) + parseInt(c.actually_failed||0,10) + parseInt(c.still_pending||0,10);
+            const pct = total ? Math.round(100 * parseInt(c.actually_sent||0,10) / total) : 0;
+            const statusColor = c.status === 'completed' ? '#16a34a' : c.status === 'running' ? '#f59e0b' : c.status === 'aborted_rate_limit' ? '#dc2626' : '#777';
+            return `
+                <div style="padding:14px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <div>
+                            <strong>${escapeHtml(c.name)}</strong>
+                            <span class="muted"> · #${c.id} · ${new Date(c.created_at).toLocaleString('es-AR')}</span>
+                        </div>
+                        <span class="tag" style="background:${statusColor};color:white">${escapeHtml(c.status)}</span>
+                    </div>
+                    <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+                    <div class="muted" style="margin-top:6px">
+                        ✅ ${c.actually_sent||0} enviados · ❌ ${c.actually_failed||0} fallaron · ⏳ ${c.still_pending||0} pendientes
+                    </div>
+                </div>`;
+        }).join('');
+    } catch(e){
+        $('#campaigns-list').innerHTML = '<p class="empty-state">Error: '+escapeHtml(e.message)+'</p>';
+    }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function tick(){
+    $('#now').textContent = new Date().toLocaleTimeString('es-AR');
+}
+setInterval(tick, 1000);
+tick();
+loadOverview();
+</script>
+</body>
+</html>

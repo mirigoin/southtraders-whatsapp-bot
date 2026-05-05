@@ -330,6 +330,152 @@ module.exports = function setupDashboardRoutes(app, pool) {
     });
 
     // -----------------------------------------------------------------------
+    // CONVERSATIONS - lectura y respuesta de chats con clientes
+    // -----------------------------------------------------------------------
+
+    // GET /conversations - lista de conversaciones con preview del último mensaje
+    // Joinea con crm_contacts para traer nombre/empresa
+    app.get('/conversations', auth, async function (req, res) {
+        try {
+            const r = await pool.query(`
+                WITH ranked AS (
+                    SELECT phone, role, content, ts,
+                        ROW_NUMBER() OVER (PARTITION BY phone ORDER BY ts DESC) AS rn
+                    FROM conversations
+                ),
+                last_msg AS (
+                    SELECT phone,
+                        MAX(ts) AS last_ts,
+                        MAX(ts) FILTER (WHERE role = 'user') AS last_user_ts,
+                        COUNT(*) AS msg_count
+                    FROM conversations
+                    GROUP BY phone
+                )
+                SELECT
+                    lm.phone,
+                    lm.last_ts,
+                    lm.last_user_ts,
+                    lm.msg_count,
+                    r.role AS last_role,
+                    LEFT(r.content, 120) AS last_preview,
+                    c.name,
+                    c.company,
+                    c.tipo,
+                    c.origen,
+                    c.region,
+                    -- 24h window: can reply free text if user wrote in last 24h
+                    CASE WHEN lm.last_user_ts > NOW() - INTERVAL '24 hours' THEN TRUE ELSE FALSE END AS can_reply_free
+                FROM last_msg lm
+                LEFT JOIN ranked r ON r.phone = lm.phone AND r.rn = 1
+                LEFT JOIN crm_contacts c ON c.phone = lm.phone OR c.phone = '+' || lm.phone
+                ORDER BY lm.last_ts DESC
+                LIMIT 200
+            `);
+            res.json({ ok: true, count: r.rows.length, conversations: r.rows });
+        } catch (e) {
+            console.error('[conversations] err:', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // GET /conversations/:phone - todos los mensajes de un contacto en orden cronológico
+    app.get('/conversations/:phone', auth, async function (req, res) {
+        try {
+            const phone = req.params.phone;
+            const r = await pool.query(
+                `SELECT phone, role, content, ts FROM conversations WHERE phone = $1 ORDER BY ts ASC LIMIT 500`,
+                [phone]
+            );
+            // Also fetch contact info for header
+            const cr = await pool.query(
+                `SELECT phone, name, company, tipo, origen, region, ubicacion FROM crm_contacts WHERE phone = $1 OR phone = '+' || $1 LIMIT 1`,
+                [phone]
+            );
+            // Compute reply window
+            const lastUser = r.rows.filter(m => m.role === 'user').slice(-1)[0];
+            const canReplyFree = lastUser && (Date.now() - new Date(lastUser.ts).getTime()) < 24 * 60 * 60 * 1000;
+            const lastUserTs = lastUser ? lastUser.ts : null;
+            res.json({
+                ok: true,
+                contact: cr.rows[0] || null,
+                messages: r.rows,
+                can_reply_free: canReplyFree,
+                last_user_ts: lastUserTs
+            });
+        } catch (e) {
+            console.error('[conversations/:phone] err:', e);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // POST /conversations/:phone/reply - responder texto libre dentro de ventana 24h
+    // body: { text }
+    app.post('/conversations/:phone/reply', auth, async function (req, res) {
+        const phone = req.params.phone;
+        const phoneId = process.env.PHONE_NUMBER_ID;
+        const token = process.env.WHATSAPP_TOKEN;
+        const { text } = req.body || {};
+
+        if (!text || !text.trim()) {
+            return res.status(400).json({ ok: false, error: 'text requerido' });
+        }
+        if (!phoneId || !token) {
+            return res.status(500).json({ ok: false, error: 'PHONE_NUMBER_ID o WHATSAPP_TOKEN faltan' });
+        }
+
+        // Validate 24h window
+        try {
+            const lastUserR = await pool.query(
+                `SELECT ts FROM conversations WHERE phone = $1 AND role = 'user' ORDER BY ts DESC LIMIT 1`,
+                [phone]
+            );
+            if (lastUserR.rows.length === 0) {
+                return res.status(400).json({ ok: false, error: 'el contacto nunca escribió - debés iniciar con un template' });
+            }
+            const ageMs = Date.now() - new Date(lastUserR.rows[0].ts).getTime();
+            if (ageMs > 24 * 60 * 60 * 1000) {
+                return res.status(400).json({ ok: false, error: 'ventana 24h expirada - debés usar un template aprobado' });
+            }
+        } catch (e) {
+            return res.status(500).json({ ok: false, error: 'error validando ventana 24h: ' + e.message });
+        }
+
+        // Send message
+        try {
+            const targetPhone = String(phone).replace(/^\+/, '');
+            const url = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
+            await axios.post(url, {
+                messaging_product: 'whatsapp',
+                to: targetPhone,
+                type: 'text',
+                text: { body: text }
+            }, {
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                timeout: 12000
+            });
+            // Persist in conversations as if it was an assistant message (since it goes from the bot account)
+            // Mark with autor in detalle so we can distinguish human-sent from sofia-sent
+            const author = whoami(req);
+            try {
+                await pool.query(
+                    `INSERT INTO conversations (phone, role, content, ts) VALUES ($1, 'assistant', $2, NOW())`,
+                    [phone, text]
+                );
+            } catch (e) { /* ignore */ }
+            // Log in crm_interactions so it's visible in the contact panel too
+            await logInteraction(phone, author, 'reply_human', `Respuesta manual: ${text.slice(0, 200)}`);
+            // Bump last_contact
+            try {
+                await pool.query(`UPDATE crm_contacts SET last_contact = NOW() WHERE phone = $1 OR phone = '+' || $1`, [phone]);
+            } catch (e) { /* ignore */ }
+            res.json({ ok: true });
+        } catch (e) {
+            const errMsg = (e.response && e.response.data && e.response.data.error && e.response.data.error.message) || e.message;
+            res.status(500).json({ ok: false, error: errMsg });
+        }
+    });
+
+    // -----------------------------------------------------------------------
     // POST /crm/contact/:phone/sofia - dispara mensaje 1-a-1 via Sofía
     // body: { templateName, language, mode } | { text }
     // mode: 'template' (usa template aprobado) | 'free' (texto libre, solo si hay sesión 24h)

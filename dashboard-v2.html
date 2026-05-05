@@ -510,6 +510,190 @@
     color: var(--text-3);
     font-size: 12px;
   }
+
+  /* CONVERSATIONS */
+  .conv-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: calc(100vh - 110px);
+    background: var(--surface);
+  }
+  .conv-list {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: var(--surface);
+  }
+  .conv-item {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    gap: 4px;
+  }
+  .conv-item:hover { background: var(--surface-2); }
+  .conv-item.active { background: var(--info-soft); }
+  .conv-item-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 8px;
+  }
+  .conv-item-name {
+    font-weight: 600; font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .conv-item-time { font-size: 10.5px; color: var(--text-3); flex-shrink: 0; }
+  .conv-item-preview {
+    font-size: 11.5px; color: var(--text-2);
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.35;
+  }
+  .conv-item-preview.from-user { color: var(--text); font-weight: 500; }
+  .conv-item-meta {
+    display: flex; gap: 4px; align-items: center;
+    margin-top: 2px;
+  }
+  .conv-item-meta .pill { font-size: 9.5px; padding: 1px 6px; }
+  .conv-item-window {
+    font-size: 9.5px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .conv-item-window.open { background: var(--accent-soft); color: var(--accent); }
+  .conv-item-window.closed { background: var(--surface-2); color: var(--text-3); }
+
+  .conv-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f0f2f5;
+  }
+  .conv-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    font-size: 14px;
+  }
+  .conv-header {
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+  }
+  .conv-header h3 { margin: 0 0 2px 0; font-size: 14px; }
+  .conv-header .sub { font-size: 11px; color: var(--text-3); }
+  .conv-header-actions { display: flex; gap: 6px; }
+
+  .conv-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 12%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .msg { display: flex; max-width: 75%; }
+  .msg.user { align-self: flex-start; }
+  .msg.assistant { align-self: flex-end; }
+  .msg-bubble {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-shadow: 0 1px 0 rgba(0,0,0,.05);
+  }
+  .msg.user .msg-bubble {
+    background: #ffffff;
+    border-top-left-radius: 2px;
+  }
+  .msg.assistant .msg-bubble {
+    background: #d9fdd3;
+    border-top-right-radius: 2px;
+  }
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 2px;
+    align-self: flex-end;
+  }
+  .msg.user .msg-time { align-self: flex-start; }
+  .msg-day-divider {
+    text-align: center;
+    margin: 12px 0 4px 0;
+    font-size: 10.5px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .msg-day-divider span {
+    background: rgba(255,255,255,.7);
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+
+  .conv-composer {
+    padding: 10px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .conv-composer textarea {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid var(--border-2);
+    border-radius: 18px;
+    font: inherit;
+    font-size: 13px;
+    resize: none;
+    outline: none;
+    max-height: 120px;
+    min-height: 36px;
+    line-height: 1.4;
+  }
+  .conv-composer textarea:focus { border-color: var(--info); }
+  .conv-composer button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .conv-composer button:disabled { background: var(--text-3); cursor: not-allowed; }
+  .conv-composer-locked {
+    padding: 14px 16px;
+    background: var(--warn-soft);
+    border-top: 1px solid var(--warn);
+    color: var(--warn);
+    font-size: 12px;
+    text-align: center;
+  }
+  .conv-composer-locked strong { color: var(--text); }
+  .conv-composer-locked button {
+    margin-left: 10px;
+    background: var(--warn);
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -525,6 +709,7 @@
 <nav class="tabs">
   <button class="tab-btn active" data-tab="overview">📊 Resumen</button>
   <button class="tab-btn" data-tab="contacts">👥 Contactos <span class="badge" id="contactsBadge">0</span></button>
+  <button class="tab-btn" data-tab="conversations">💬 Conversaciones <span class="badge" id="convsBadge">0</span></button>
   <button class="tab-btn" data-tab="campaigns">📈 Campañas <span class="badge" id="campsBadge">0</span></button>
   <button class="tab-btn" data-tab="newcamp">📤 Nueva campaña</button>
 </nav>
@@ -585,6 +770,21 @@
               <tr><td colspan="9" class="empty-state">Cargando contactos…</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONVERSATIONS -->
+  <section class="section" id="section-conversations">
+    <div class="conv-layout">
+      <aside class="conv-list" id="convList">
+        <div class="loader">Cargando conversaciones…</div>
+      </aside>
+      <div class="conv-main" id="convMain">
+        <div class="conv-empty">
+          <div style="font-size: 36px; margin-bottom: 8px;">💬</div>
+          <div>Elegí una conversación de la lista</div>
         </div>
       </div>
     </div>
@@ -817,6 +1017,7 @@ $$('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'campaigns') loadCampaigns();
     if (btn.dataset.tab === 'newcamp') ensureTemplatesLoaded().then(populateNewCamp);
     if (btn.dataset.tab === 'overview') renderOverview();
+    if (btn.dataset.tab === 'conversations') loadConversations();
   };
 });
 
@@ -1600,10 +1801,244 @@ function renderOverview() {
 }
 
 //===========================================================================
+// CONVERSATIONS
+//===========================================================================
+const convState = {
+  list: [],
+  selectedPhone: null,
+  messages: [],
+  contact: null,
+  canReplyFree: false,
+  lastUserTs: null,
+  pollTimer: null,
+};
+
+async function loadConversations() {
+  try {
+    const r = await api('/conversations');
+    convState.list = r.conversations;
+    $('#convsBadge').textContent = r.conversations.filter(c => c.can_reply_free).length;
+    renderConvList();
+    // If a conversation is selected, refresh its messages too
+    if (convState.selectedPhone) loadConversationMessages(convState.selectedPhone, true);
+  } catch (e) {
+    $('#convList').innerHTML = '<div class="empty-state">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderConvList() {
+  if (convState.list.length === 0) {
+    $('#convList').innerHTML = '<div class="empty-state" style="padding:40px 20px;font-size:12px;">Sin conversaciones todavía</div>';
+    return;
+  }
+  $('#convList').innerHTML = convState.list.map(c => {
+    const name = c.company || c.name || c.phone;
+    const sel = c.phone === convState.selectedPhone ? 'active' : '';
+    const isFromUser = c.last_role === 'user';
+    const tipoPill = c.tipo ? `<span class="${pillClass(c.tipo, 'tipo')}">${esc(c.tipo)}</span>` : '';
+    const windowPill = c.can_reply_free
+      ? '<span class="conv-item-window open">🟢 24h abierta</span>'
+      : '<span class="conv-item-window closed">🔒 cerrada</span>';
+    return `<div class="conv-item ${sel}" data-phone="${esc(c.phone)}">
+      <div class="conv-item-head">
+        <span class="conv-item-name">${esc(name)}</span>
+        <span class="conv-item-time">${fmtConvTime(c.last_ts)}</span>
+      </div>
+      <div class="conv-item-preview ${isFromUser ? 'from-user' : ''}">
+        ${isFromUser ? '' : '✓ '}${esc(c.last_preview || '')}
+      </div>
+      <div class="conv-item-meta">
+        ${tipoPill} ${windowPill}
+      </div>
+    </div>`;
+  }).join('');
+  $$('#convList .conv-item').forEach(el => {
+    el.onclick = () => loadConversationMessages(el.dataset.phone, false);
+  });
+}
+
+function fmtConvTime(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  const now = new Date();
+  const sameDay = dt.toDateString() === now.toDateString();
+  if (sameDay) return dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  if (dt.toDateString() === yesterday.toDateString()) return 'ayer';
+  const diff = (now - dt) / (1000 * 60 * 60 * 24);
+  if (diff < 7) return dt.toLocaleDateString('es-AR', { weekday: 'short' });
+  return dt.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
+
+async function loadConversationMessages(phone, isRefresh) {
+  if (!isRefresh) convState.selectedPhone = phone;
+  try {
+    const r = await api('/conversations/' + encodeURIComponent(phone));
+    convState.messages = r.messages;
+    convState.contact = r.contact;
+    convState.canReplyFree = r.can_reply_free;
+    convState.lastUserTs = r.last_user_ts;
+    if (!isRefresh) renderConvList();  // re-render to show selection
+    renderConvMain();
+  } catch (e) {
+    $('#convMain').innerHTML = '<div class="conv-empty">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderConvMain() {
+  const c = convState.contact;
+  const phone = convState.selectedPhone;
+  const name = (c && (c.company || c.name)) || phone;
+  const sub = c ? [c.tipo, c.region, c.origen].filter(Boolean).join(' · ') : phone;
+
+  // Composer area
+  let composerHTML;
+  if (convState.canReplyFree) {
+    composerHTML = `
+      <div class="conv-composer">
+        <textarea id="convInput" rows="1" placeholder="Escribí una respuesta…"></textarea>
+        <button id="convSendBtn" title="Enviar">▶</button>
+      </div>
+    `;
+  } else {
+    const lastMsg = convState.lastUserTs
+      ? 'Último mensaje del cliente: ' + fmtDateTime(convState.lastUserTs)
+      : 'El cliente nunca escribió';
+    composerHTML = `
+      <div class="conv-composer-locked">
+        🔒 <strong>Ventana 24h cerrada.</strong> ${esc(lastMsg)}.
+        Para iniciar contacto necesitás un template aprobado.
+        <button id="openSofiaBtn">Mandar template via Sofía</button>
+      </div>
+    `;
+  }
+
+  $('#convMain').innerHTML = `
+    <div class="conv-header">
+      <div>
+        <h3>${esc(name)}</h3>
+        <div class="sub">${esc(phone)}${sub && c ? ' · ' + esc(sub) : ''}</div>
+      </div>
+      <div class="conv-header-actions">
+        <button class="btn secondary" id="convOpenContactBtn">Ver ficha</button>
+      </div>
+    </div>
+    <div class="conv-messages" id="convMessages"></div>
+    ${composerHTML}
+  `;
+
+  // Render messages with day dividers
+  const msgsContainer = $('#convMessages');
+  let lastDay = '';
+  msgsContainer.innerHTML = convState.messages.map(m => {
+    const dt = new Date(m.ts);
+    const dayStr = dt.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    let divider = '';
+    if (dayStr !== lastDay) {
+      divider = `<div class="msg-day-divider"><span>${esc(dayStr)}</span></div>`;
+      lastDay = dayStr;
+    }
+    const time = dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    return `${divider}
+      <div class="msg ${esc(m.role)}">
+        <div>
+          <div class="msg-bubble">${esc(m.content)}</div>
+          <div class="msg-time">${time}</div>
+        </div>
+      </div>`;
+  }).join('');
+  // Scroll to bottom
+  msgsContainer.scrollTop = msgsContainer.scrollHeight;
+
+  // Wire up composer
+  if (convState.canReplyFree) {
+    const ta = $('#convInput');
+    ta.oninput = () => {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    };
+    ta.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendConvReply();
+      }
+    };
+    $('#convSendBtn').onclick = sendConvReply;
+    setTimeout(() => ta.focus(), 100);
+  } else {
+    const openBtn = $('#openSofiaBtn');
+    if (openBtn) {
+      openBtn.onclick = () => {
+        // Open the contact panel directly on Sofia tab
+        // First ensure the contact is loaded; switch to contacts tab and trigger detail
+        // Simplest: alert + navigate
+        if (c && c.phone) {
+          openDetail(c.phone);
+          // switch to sofia pane
+          setTimeout(() => {
+            $$('.detail-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === 'sofia'));
+            $$('.detail-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-sofia'));
+            ensureTemplatesLoaded().then(populateSofiaTemplates);
+            // switch UI to contacts tab
+            $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'contacts'));
+            $$('.section').forEach(s => s.classList.toggle('active', s.id === 'section-contacts'));
+          }, 100);
+        } else {
+          toast('Este teléfono no está en el CRM. Agregalo primero desde Contactos.', 'error');
+        }
+      };
+    }
+  }
+
+  $('#convOpenContactBtn').onclick = () => {
+    if (c && c.phone) {
+      openDetail(c.phone);
+      $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'contacts'));
+      $$('.section').forEach(s => s.classList.toggle('active', s.id === 'section-contacts'));
+    } else {
+      toast('Este teléfono no está en el CRM', 'error');
+    }
+  };
+}
+
+async function sendConvReply() {
+  const ta = $('#convInput');
+  const text = ta.value.trim();
+  if (!text) return;
+  $('#convSendBtn').disabled = true;
+  try {
+    await api('/conversations/' + encodeURIComponent(convState.selectedPhone) + '/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    ta.value = '';
+    ta.style.height = 'auto';
+    // Optimistically add message
+    convState.messages.push({ phone: convState.selectedPhone, role: 'assistant', content: text, ts: new Date().toISOString() });
+    renderConvMain();
+    toast('Mensaje enviado ✓', 'success');
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    const btn = $('#convSendBtn');
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Auto-refresh every 15s while on conversations tab
+setInterval(() => {
+  const onConvs = $('#section-conversations').classList.contains('active');
+  if (onConvs) loadConversations();
+}, 15000);
+
+//===========================================================================
 // BOOTSTRAP
 //===========================================================================
 loadFacetsAndContacts();
 ensureTemplatesLoaded();
+// Pre-fetch conversations count for badge on first load
+loadConversations();
 
 </script>
 </body>

@@ -911,11 +911,16 @@ function renderTable() {
   }
   tbody.innerHTML = rows.map(c => {
     const sel = c.phone === state.selectedPhone ? ' selected' : '';
-    const empresa = c.company || c.name || '<span style="color:var(--text-3)">(sin nombre)</span>';
+    let empresaTxt = c.company || c.name;
+    // Treat placeholder "??" or whitespace as missing
+    if (empresaTxt && /^[\s?]*$/.test(empresaTxt)) empresaTxt = null;
+    const empresaCell = empresaTxt
+      ? esc(empresaTxt)
+      : '<span style="color:var(--text-3)">(sin nombre)</span>';
     const sub = c.company && c.name ? `<div class="sub">${esc(c.name)}</div>` : '';
     const phoneClean = c.phone && c.phone.startsWith('__nophone') ? '<em style="color:var(--text-3)">sin tel</em>' : esc(c.phone);
     return `<tr class="${sel}" data-phone="${esc(c.phone)}">
-      <td class="empresa">${esc(empresa)}${sub}</td>
+      <td class="empresa">${empresaCell}${sub}</td>
       <td>${phoneClean}</td>
       <td>${c.tipo ? `<span class="${pillClass(c.tipo, 'tipo')}">${esc(c.tipo)}</span>` : ''}</td>
       <td>${c.origen ? `<span class="${pillClass(c.origen, 'origen')}">${esc(c.origen)}</span>` : ''}</td>

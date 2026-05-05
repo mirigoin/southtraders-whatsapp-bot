@@ -98,6 +98,49 @@ module.exports = function setupDashboardRoutes(app, pool) {
         }
     }
 
+    // Helper: render template body with parameter substitution.
+    // Used to persist what the customer actually saw in the conversations table,
+    // so Sofía's bot doesn't re-greet on the next user reply.
+    async function renderTemplateBody(name, language, parameters) {
+        try {
+            // Use cache if fresh; otherwise fetch
+            if (!templatesCache.data || (Date.now() - templatesCache.ts) > TEMPLATES_TTL) {
+                const r = await fetchTemplates();
+                if (r.ok) templatesCache = { data: r.templates, ts: Date.now() };
+            }
+            const tpls = templatesCache.data || [];
+            let tpl = tpls.find(t => t.name === name && t.language === language);
+            if (!tpl) tpl = tpls.find(t => t.name === name);
+            if (!tpl || !tpl.components) return `[${name}/${language}]`;
+            const body = tpl.components.find(c => (c.type || '').toUpperCase() === 'BODY');
+            let txt = (body && body.text) || '';
+            if (Array.isArray(parameters) && parameters.length > 0) {
+                txt = txt.replace(/\{\{(\d+)\}\}/g, (m, idx) => {
+                    const v = parameters[parseInt(idx, 10) - 1];
+                    return v === undefined || v === '' ? m : String(v);
+                });
+            }
+            return txt || `[${name}/${language}]`;
+        } catch (e) {
+            return `[${name}/${language}]`;
+        }
+    }
+
+    // Helper: persist a sent assistant message in conversations so the bot's
+    // history-aware logic ("isNew = history.length === 0") sees it on next reply.
+    async function persistAssistantMessage(phone, content) {
+        try {
+            // Strip leading + to match the bot's webhook persistence pattern (which uses raw phone from Meta)
+            const phoneNoPlus = String(phone).replace(/^\+/, '');
+            await pool.query(
+                `INSERT INTO conversations (phone, role, content, ts) VALUES ($1, 'assistant', $2, NOW())`,
+                [phoneNoPlus, content]
+            );
+        } catch (e) {
+            console.error('[persistAssistantMessage] err:', e.message);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // GET /dashboard/v2  - sirve el HTML
     // -----------------------------------------------------------------------
@@ -453,15 +496,10 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 timeout: 12000
             });
-            // Persist in conversations as if it was an assistant message (since it goes from the bot account)
-            // Mark with autor in detalle so we can distinguish human-sent from sofia-sent
+            // Persist in conversations so the bot doesn't treat next reply as a new chat
             const author = whoami(req);
-            try {
-                await pool.query(
-                    `INSERT INTO conversations (phone, role, content, ts) VALUES ($1, 'assistant', $2, NOW())`,
-                    [phone, text]
-                );
-            } catch (e) { /* ignore */ }
+            // Persist what was sent. Use the same format the bot uses (no leading +)
+            await persistAssistantMessage(phone, text);
             // Log in crm_interactions so it's visible in the contact panel too
             await logInteraction(phone, author, 'reply_human', `Respuesta manual: ${text.slice(0, 200)}`);
             // Bump last_contact
@@ -537,6 +575,15 @@ module.exports = function setupDashboardRoutes(app, pool) {
                     ? `Template: ${templateName} (${language})${Array.isArray(parameters) && parameters.length ? ' · params: ' + parameters.map(p => '[' + String(p).slice(0,50) + ']').join(' ') : ''}`
                     : `Texto: ${text.slice(0, 200)}`
             );
+
+            // Persist what the customer actually saw in conversations table
+            // so Sofía's bot logic sees the prior outreach and doesn't re-greet.
+            if (mode === 'template') {
+                const renderedBody = await renderTemplateBody(templateName, language, parameters || []);
+                await persistAssistantMessage(phone, renderedBody);
+            } else {
+                await persistAssistantMessage(phone, text);
+            }
 
             // Bump last_contact
             try {
@@ -654,6 +701,23 @@ module.exports = function setupDashboardRoutes(app, pool) {
                     timeout: 15000
                 });
                 camp.sent++;
+                // Persist what the customer actually saw (with parameter substitution)
+                // so Sofía's "isNew = history.length === 0" check sees the prior outreach
+                // and doesn't re-greet on their reply.
+                let renderedBody;
+                if (Array.isArray(parametersTemplate) && parametersTemplate.length > 0) {
+                    const resolvedFor = parametersTemplate.map(p => {
+                        if (p === null || p === undefined || p === '') return c.name || c.company || 'cliente';
+                        const s = String(p);
+                        if (s === '{nombre}' || s === '{name}') return c.name || c.company || 'cliente';
+                        if (s === '{empresa}' || s === '{company}') return c.company || c.name || 'cliente';
+                        return s;
+                    });
+                    renderedBody = await renderTemplateBody(templateName, language, resolvedFor);
+                } else {
+                    renderedBody = await renderTemplateBody(templateName, language, []);
+                }
+                await persistAssistantMessage(c.phone, renderedBody);
                 logInteraction(c.phone, camp.createdBy, 'campaign', `Campaña ${campaignId} (${templateName})`).catch(() => {});
                 pool.query(`UPDATE crm_contacts SET last_contact = NOW() WHERE phone = $1`, [c.phone]).catch(() => {});
             } catch (e) {

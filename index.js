@@ -426,6 +426,58 @@ async function askClaude(phone, userText) {
   }
 }
 
+// =============================================================================
+// summarizeAndLogNote: análisis liviano de la conversación cada N turns.
+// Llama a Claude Haiku con los últimos mensajes y guarda una nota en crm_interactions
+// con tipo='nota_ia' autor='sofia'. NO toca columnas humanas (respuesta/feedback/nota_compra).
+// Se llama de forma async (fire-and-forget) para no bloquear la respuesta al cliente.
+// Se ejecuta solo cada 3 mensajes del usuario para ahorrar tokens.
+// =============================================================================
+async function summarizeAndLogNote(phone) {
+  try {
+    const history = await loadConversation(phone);
+    if (!history || history.length < 2) return;
+
+    // Solo loggea cada 3 mensajes del usuario para no saturar
+    const userMsgCount = history.filter(function(m){ return m.role === 'user'; }).length;
+    if (userMsgCount % 3 !== 0) return;
+
+    // Tomar últimos 8 mensajes para el resumen
+    const recent = history.slice(-8);
+    const transcript = recent.map(function(m){
+      return (m.role === 'user' ? 'CLIENTE: ' : 'SOFIA: ') + (m.content || '').slice(0, 400);
+    }).join('\n');
+
+    const prompt = 'Sos un analista de ventas mayoristas. Analizá esta conversación entre un potencial cliente y la asistente Sofía de South Traders Corp (distribuidor mayorista Apple/Samsung).\n\n' +
+      'Generá una nota MUY breve (max 150 caracteres) describiendo:\n' +
+      '- Qué producto/cantidad le interesa al cliente (si lo dijo)\n' +
+      '- Estado: COTIZANDO / PIDE_INFO / NEGOCIANDO / SIN_INTERES / DESHABILITADO\n' +
+      '- Algún dato clave: empresa, país, urgencia\n\n' +
+      'Formato exacto: "ESTADO: <estado> | <descripcion breve>"\n' +
+      'Si la conversación es trivial (solo "hola", "ok"), respondé exactamente: SKIP\n\n' +
+      'CONVERSACION:\n' + transcript;
+
+    const resp = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      { model: 'claude-haiku-4-5', max_tokens: 80, messages: [{ role: 'user', content: prompt }] },
+      { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 15000 }
+    );
+    const note = resp.data && resp.data.content && resp.data.content[0] && resp.data.content[0].text;
+    if (!note || note.trim() === 'SKIP' || note.trim().length < 5) return;
+
+    const cleanNote = note.trim().slice(0, 250);
+    // Guardar en crm_interactions. Usar el phone con + porque crm_contacts.phone tiene + típicamente.
+    const phoneWithPlus = phone.startsWith('+') ? phone : '+' + phone;
+    await pool.query(
+      'INSERT INTO crm_interactions (contact_phone, autor, tipo, detalle) VALUES ($1, $2, $3, $4)',
+      [phoneWithPlus, 'sofia', 'nota_ia', cleanNote]
+    );
+    console.log('[nota_ia] ' + phone + ': ' + cleanNote.slice(0, 80));
+  } catch (e) {
+    console.error('[summarizeAndLogNote] err:', e.message);
+  }
+}
+
 async function sendWA(to, text) {
   // Sanitize: WhatsApp uses single * for bold, not **. Convert ** to * defensively
   // in case the model still emits markdown despite the prompt.
@@ -500,6 +552,9 @@ async function handleMessage(phone, text) {
   }
   await sendWA(phone, reply);
   console.log('[OUT] ' + phone + ': ' + reply.slice(0,80));
+
+  // Análisis async (fire-and-forget) para loggear nota_ia en crm_interactions sin bloquear.
+  summarizeAndLogNote(phone).catch(function(e){ console.error('[nota_ia bg]:', e.message); });
 
   // Notificar si hay proforma
   const isProforma = reply.toLowerCase().includes('proforma') || reply.toLowerCase().includes('wire transfer') || reply.toLowerCase().includes('total usd');

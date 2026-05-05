@@ -712,6 +712,7 @@
   <button class="tab-btn" data-tab="conversations">💬 Conversaciones <span class="badge" id="convsBadge">0</span></button>
   <button class="tab-btn" data-tab="campaigns">📈 Campañas <span class="badge" id="campsBadge">0</span></button>
   <button class="tab-btn" data-tab="newcamp">📤 Nueva campaña</button>
+  <button class="tab-btn" data-tab="reports">📊 Reportes</button>
 </nav>
 
 <main>
@@ -847,6 +848,27 @@
       </div>
     </div>
   </section>
+
+  <!-- REPORTES -->
+  <section class="section" id="section-reports">
+    <div class="panel-wrap">
+      <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin: 0;">Reportes operativos</h2>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <label style="font-size: 12px; color: var(--text-2);">Ventana</label>
+            <select id="reportDays" style="padding: 6px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);">
+              <option value="7">7 días</option>
+              <option value="30" selected>30 días</option>
+              <option value="90">90 días</option>
+            </select>
+            <button class="btn" id="reportRefresh">🔄 Actualizar</button>
+          </div>
+        </div>
+        <div id="reportContent" class="loader">Cargando…</div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <!-- Detail panel -->
@@ -868,6 +890,10 @@
     <div class="detail-pane active" id="pane-info">
       <div class="field-grid" id="infoGrid">
         <!-- populated by JS -->
+      </div>
+      <div id="adminActions" style="display: none; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+        <div style="font-size: 11px; color: var(--danger, #d33); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">⚠️ Zona admin</div>
+        <button class="btn" id="deleteContactBtn" style="background: #c43; color: #fff; border-color: #c43;">🗑 Borrar contacto + historial</button>
       </div>
     </div>
 
@@ -1018,6 +1044,7 @@ $$('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'newcamp') ensureTemplatesLoaded().then(populateNewCamp);
     if (btn.dataset.tab === 'overview') renderOverview();
     if (btn.dataset.tab === 'conversations') loadConversations();
+    if (btn.dataset.tab === 'reports') loadReports();
   };
 });
 
@@ -1179,6 +1206,8 @@ async function openDetail(phone) {
   $$('.detail-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === 'info'));
   $$('.detail-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-info'));
   renderInfoForm(c);
+  // Show admin actions only for marcelo
+  $('#adminActions').style.display = state.user === 'marcelo' ? 'block' : 'none';
   detailPanel.classList.add('open');
   renderTable();
 }
@@ -2039,6 +2068,214 @@ loadFacetsAndContacts();
 ensureTemplatesLoaded();
 // Pre-fetch conversations count for badge on first load
 loadConversations();
+
+//===========================================================================
+// DELETE CONTACT (solo marcelo)
+//===========================================================================
+$('#deleteContactBtn').onclick = async () => {
+  if (!state.selectedPhone) return;
+  if (state.user !== 'marcelo') {
+    toast('Solo marcelo puede borrar contactos', 'error');
+    return;
+  }
+  const c = state.contacts.find(x => x.phone === state.selectedPhone);
+  const label = c ? (c.company || c.name || state.selectedPhone) : state.selectedPhone;
+  const ok = confirm(
+    'BORRAR PERMANENTEMENTE:\n\n' +
+    label + ' (' + state.selectedPhone + ')\n\n' +
+    'Se eliminarán: contacto, todas las interacciones, todas las conversaciones.\n\n' +
+    'Esta acción NO se puede deshacer. ¿Confirmás?'
+  );
+  if (!ok) return;
+  // Doble confirmación: typear DELETE
+  const typed = prompt('Para confirmar, escribí: BORRAR');
+  if (typed !== 'BORRAR') {
+    toast('Cancelado', 'info');
+    return;
+  }
+  try {
+    const r = await api('/crm/contact/' + encodeURIComponent(state.selectedPhone), { method: 'DELETE' });
+    const d = (r && r.deleted) || {};
+    toast('Borrado: contacto + ' + (d.interactions || 0) + ' interacciones + ' + (d.conversations || 0) + ' mensajes', 'success');
+    closeDetail();
+    await loadFacetsAndContacts();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+};
+
+//===========================================================================
+// REPORTES
+//===========================================================================
+async function loadReports() {
+  const days = $('#reportDays').value || '30';
+  $('#reportContent').innerHTML = '<div class="loader">Cargando reportes…</div>';
+  try {
+    const r = await api('/reports/overview?days=' + days);
+    renderReports(r.report);
+  } catch (e) {
+    $('#reportContent').innerHTML = '<div style="color:#c43;">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+$('#reportRefresh').onclick = loadReports;
+$('#reportDays').onchange = loadReports;
+
+function renderReports(rep) {
+  const t = rep.totals || {};
+  const funnel = rep.funnel || {};
+  const sofia = rep.sofia_perf || {};
+  const tasaResp = rep.tasa_respuesta || [];
+  const porUser = rep.por_usuario || [];
+  const tplsPop = rep.templates_populares || [];
+  const sinResp = rep.sin_respuesta_sofia || [];
+  const dailyVol = rep.daily_volume || [];
+
+  // Tasa de respuesta global
+  const totalContactados = parseInt(funnel.contactados_periodo || 0, 10);
+  const totalRespondieron = parseInt(funnel.respondieron_periodo || 0, 10);
+  const tasaGlobal = totalContactados > 0 ? Math.round(100 * totalRespondieron / totalContactados) : 0;
+
+  // Eficiencia Sofía
+  const sofiaTotal = parseInt(sofia.total_respuestas_sofia || 0, 10);
+  const sofiaDeriva = parseInt(sofia.derivaciones_humano || 0, 10);
+  const sofiaAuto = sofiaTotal - sofiaDeriva;
+  const sofiaAutoPct = sofiaTotal > 0 ? Math.round(100 * sofiaAuto / sofiaTotal) : 0;
+
+  let html = '';
+
+  // KPIs principales
+  html += '<div class="stats" style="margin-bottom: 20px;">';
+  html += '  <div class="stat"><div class="num">' + (t.unique_phones || 0) + '</div><div class="label">Conversaciones únicas</div></div>';
+  html += '  <div class="stat"><div class="num">' + (t.total_outbound || 0) + '</div><div class="label">Mensajes outbound</div></div>';
+  html += '  <div class="stat"><div class="num">' + (t.total_inbound || 0) + '</div><div class="label">Mensajes inbound</div></div>';
+  html += '  <div class="stat"><div class="num">' + (rep.conv_24h_abiertas || 0) + '</div><div class="label">Ventana 24h abierta</div></div>';
+  html += '</div>';
+
+  // Funnel
+  html += '<div class="panel" style="margin-bottom: 16px;">';
+  html += '  <h3 style="margin: 0 0 12px 0;">Pipeline de los últimos ' + (rep.window_days || 30) + ' días</h3>';
+  html += '  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">';
+  html += '    <div style="background: var(--surface-2); padding: 12px; border-radius: 6px;"><div style="font-size: 24px; font-weight: 700;">' + (funnel.total_contactos || 0) + '</div><div style="font-size: 11px; color: var(--text-2); text-transform: uppercase;">Total CRM</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 12px; border-radius: 6px;"><div style="font-size: 24px; font-weight: 700;">' + totalContactados + '</div><div style="font-size: 11px; color: var(--text-2); text-transform: uppercase;">Contactados</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 12px; border-radius: 6px;"><div style="font-size: 24px; font-weight: 700;">' + totalRespondieron + '</div><div style="font-size: 11px; color: var(--text-2); text-transform: uppercase;">Respondieron (' + tasaGlobal + '%)</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 12px; border-radius: 6px;"><div style="font-size: 24px; font-weight: 700;">' + (funnel.interesados_periodo || 0) + '</div><div style="font-size: 11px; color: var(--text-2); text-transform: uppercase;">Interesados</div></div>';
+  html += '  </div>';
+  html += '</div>';
+
+  // Por usuario
+  html += '<div class="panel" style="margin-bottom: 16px;">';
+  html += '  <h3 style="margin: 0 0 12px 0;">Actividad por usuario</h3>';
+  if (porUser.length === 0) {
+    html += '  <div style="color: var(--text-2); font-size: 13px;">Sin actividad en este período.</div>';
+  } else {
+    html += '  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">';
+    html += '    <thead><tr style="border-bottom: 1px solid var(--border); text-align: left;">';
+    html += '      <th style="padding: 8px;">Usuario</th>';
+    html += '      <th style="padding: 8px; text-align: right;">Mensajes enviados</th>';
+    html += '      <th style="padding: 8px; text-align: right;">Contactos únicos</th>';
+    html += '      <th style="padding: 8px; text-align: right;">Respuestas manuales</th>';
+    html += '      <th style="padding: 8px; text-align: right;">Tasa respuesta</th>';
+    html += '    </tr></thead><tbody>';
+    porUser.forEach(u => {
+      const tr = tasaResp.find(x => x.autor === u.autor);
+      const tasa = tr ? (tr.tasa_respuesta_pct + '% (' + tr.respondieron + '/' + tr.contactados + ')') : '—';
+      html += '    <tr style="border-bottom: 1px solid var(--border);">';
+      html += '      <td style="padding: 8px;"><strong>' + esc(u.autor || '?') + '</strong></td>';
+      html += '      <td style="padding: 8px; text-align: right;">' + (u.mensajes_enviados || 0) + '</td>';
+      html += '      <td style="padding: 8px; text-align: right;">' + (u.contactos_contactados || 0) + '</td>';
+      html += '      <td style="padding: 8px; text-align: right;">' + (u.respuestas_manuales || 0) + '</td>';
+      html += '      <td style="padding: 8px; text-align: right;">' + tasa + '</td>';
+      html += '    </tr>';
+    });
+    html += '  </tbody></table>';
+  }
+  html += '</div>';
+
+  // Sofía rendimiento
+  html += '<div class="panel" style="margin-bottom: 16px;">';
+  html += '  <h3 style="margin: 0 0 12px 0;">Rendimiento de Sofía</h3>';
+  html += '  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center; margin-bottom: 14px;">';
+  html += '    <div style="background: var(--surface-2); padding: 10px; border-radius: 6px;"><div style="font-size: 20px; font-weight: 700;">' + sofiaTotal + '</div><div style="font-size: 10px; color: var(--text-2); text-transform: uppercase;">Respuestas</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 10px; border-radius: 6px;"><div style="font-size: 20px; font-weight: 700; color: #4a5;">' + sofiaAuto + '</div><div style="font-size: 10px; color: var(--text-2); text-transform: uppercase;">Autónomas (' + sofiaAutoPct + '%)</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 10px; border-radius: 6px;"><div style="font-size: 20px; font-weight: 700; color: #c83;">' + sofiaDeriva + '</div><div style="font-size: 10px; color: var(--text-2); text-transform: uppercase;">Derivadas a humano</div></div>';
+  html += '    <div style="background: var(--surface-2); padding: 10px; border-radius: 6px;"><div style="font-size: 20px; font-weight: 700;">' + (sofia.conversaciones_atendidas || 0) + '</div><div style="font-size: 10px; color: var(--text-2); text-transform: uppercase;">Conversaciones</div></div>';
+  html += '  </div>';
+
+  if (tplsPop.length > 0) {
+    html += '  <div style="font-size: 12px; color: var(--text-2); margin-bottom: 6px;">Templates más usados:</div>';
+    html += '  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">';
+    tplsPop.forEach(t => {
+      html += '    <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px;">' + esc(t.template || '(sin nombre)') + '</td><td style="padding: 6px; text-align: right;">' + t.envios + '</td></tr>';
+    });
+    html += '  </table>';
+  }
+  html += '</div>';
+
+  // Quality control
+  html += '<div class="panel" style="margin-bottom: 16px;">';
+  html += '  <h3 style="margin: 0 0 12px 0;">⚠️ Quality control - Conversaciones sin respuesta de Sofía (24h)</h3>';
+  if (sinResp.length === 0) {
+    html += '  <div style="color: var(--text-2); font-size: 13px;">Todas las conversaciones tienen respuesta. ✅</div>';
+  } else {
+    html += '  <div style="font-size: 12px; color: var(--text-2); margin-bottom: 8px;">' + sinResp.length + ' conversación(es) donde el último mensaje es del cliente sin respuesta de Sofía.</div>';
+    html += '  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">';
+    html += '    <thead><tr style="border-bottom: 1px solid var(--border); text-align: left;"><th style="padding: 6px;">Teléfono</th><th style="padding: 6px;">Último mensaje</th><th style="padding: 6px; text-align: right;">Hace</th></tr></thead><tbody>';
+    sinResp.forEach(s => {
+      const tsAgo = formatTimeAgo(s.ts);
+      html += '    <tr style="border-bottom: 1px solid var(--border);">';
+      html += '      <td style="padding: 6px; font-family: monospace; font-size: 12px;">' + esc(s.phone) + '</td>';
+      html += '      <td style="padding: 6px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + esc(s.ultimo_msg || '') + '</td>';
+      html += '      <td style="padding: 6px; text-align: right; color: var(--text-2);">' + tsAgo + '</td>';
+      html += '    </tr>';
+    });
+    html += '  </tbody></table>';
+  }
+  html += '  <div style="margin-top: 10px; font-size: 11px; color: var(--text-2);">Contactos inactivos > 30 días: <strong>' + (rep.contactos_inactivos_30d || 0) + '</strong></div>';
+  html += '</div>';
+
+  // Volumen diario (gráfico simple ASCII-bars)
+  html += '<div class="panel">';
+  html += '  <h3 style="margin: 0 0 12px 0;">Volumen diario</h3>';
+  if (dailyVol.length === 0) {
+    html += '  <div style="color: var(--text-2); font-size: 13px;">Sin datos.</div>';
+  } else {
+    const maxVal = Math.max.apply(null, dailyVol.map(d => Math.max(parseInt(d.outbound || 0, 10), parseInt(d.inbound || 0, 10))));
+    html += '  <div style="display: flex; gap: 4px; align-items: flex-end; height: 120px; overflow-x: auto; padding-bottom: 30px;">';
+    dailyVol.forEach(d => {
+      const ob = parseInt(d.outbound || 0, 10);
+      const ib = parseInt(d.inbound || 0, 10);
+      const obH = maxVal > 0 ? Math.round(100 * ob / maxVal) : 0;
+      const ibH = maxVal > 0 ? Math.round(100 * ib / maxVal) : 0;
+      const dia = (d.dia || '').slice(5);
+      html += '    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 32px; flex-shrink: 0;" title="' + dia + ': ' + ob + ' out / ' + ib + ' in">';
+      html += '      <div style="display: flex; gap: 1px; align-items: flex-end; height: 100%;">';
+      html += '        <div style="width: 10px; height: ' + obH + '%; background: #4a8; min-height: 2px;"></div>';
+      html += '        <div style="width: 10px; height: ' + ibH + '%; background: #48a; min-height: 2px;"></div>';
+      html += '      </div>';
+      html += '      <div style="font-size: 9px; color: var(--text-2); transform: rotate(-45deg); white-space: nowrap; margin-top: 4px;">' + dia + '</div>';
+      html += '    </div>';
+    });
+    html += '  </div>';
+    html += '  <div style="display: flex; gap: 16px; font-size: 11px; color: var(--text-2); margin-top: 8px;"><span><span style="display: inline-block; width: 10px; height: 10px; background: #4a8; vertical-align: middle;"></span> Outbound</span><span><span style="display: inline-block; width: 10px; height: 10px; background: #48a; vertical-align: middle;"></span> Inbound</span></div>';
+  }
+  html += '</div>';
+
+  $('#reportContent').innerHTML = html;
+}
+
+function formatTimeAgo(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'ahora';
+  if (mins < 60) return mins + ' min';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  const days = Math.floor(hrs / 24);
+  return days + 'd';
+}
 
 </script>
 </body>

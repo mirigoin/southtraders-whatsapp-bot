@@ -815,5 +815,227 @@ module.exports = function setupDashboardRoutes(app, pool) {
         res.json({ ok: true, campaigns: arr });
     });
 
+    // -----------------------------------------------------------------------
+    // DELETE /crm/contact/:phone - Borrar contacto + interacciones + conversaciones
+    // SOLO accesible por marcelo (admin)
+    // -----------------------------------------------------------------------
+    app.delete('/crm/contact/:phone', auth, async function (req, res) {
+        const author = whoami(req);
+        if (author !== 'marcelo') {
+            return res.status(403).json({ ok: false, error: 'Solo marcelo puede borrar contactos' });
+        }
+        const phone = req.params.phone;
+        if (!phone) return res.status(400).json({ ok: false, error: 'phone requerido' });
+
+        // Variantes con y sin "+" para matchear ambos formatos en DB
+        const phoneNoPlus = phone.replace(/^\+/, '');
+        const phoneWithPlus = '+' + phoneNoPlus;
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const r1 = await client.query(
+                `DELETE FROM conversations WHERE phone = $1 OR phone = $2`,
+                [phoneNoPlus, phoneWithPlus]
+            );
+            const r2 = await client.query(
+                `DELETE FROM crm_interactions WHERE contact_phone = $1 OR contact_phone = $2`,
+                [phoneNoPlus, phoneWithPlus]
+            );
+            const r3 = await client.query(
+                `DELETE FROM crm_contacts WHERE phone = $1 OR phone = $2`,
+                [phoneNoPlus, phoneWithPlus]
+            );
+            await client.query('COMMIT');
+            console.log(`[delete] ${author} borró ${phone}: conv=${r1.rowCount} inter=${r2.rowCount} contact=${r3.rowCount}`);
+            res.json({
+                ok: true,
+                deleted: {
+                    conversations: r1.rowCount,
+                    interactions: r2.rowCount,
+                    contact: r3.rowCount
+                }
+            });
+        } catch (e) {
+            await client.query('ROLLBACK');
+            console.error('[delete] err:', e.message);
+            res.status(500).json({ ok: false, error: e.message });
+        } finally {
+            client.release();
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // GET /reports/overview - métricas globales de actividad
+    // Returns: actividad por usuario, volumen, pipeline, eficacia Sofía, calidad
+    // -----------------------------------------------------------------------
+    app.get('/reports/overview', auth, async function (req, res) {
+        // Rango temporal opcional (default: últimos 30 días)
+        const days = Math.min(parseInt(req.query.days || '30', 10), 365);
+        try {
+            const out = {};
+
+            // ============ A. VOLUMEN DE ACTIVIDAD ============
+            // Mensajes outbound (Sofía/humano → cliente) por día últimos N días
+            const dailyOutbound = await pool.query(`
+                SELECT DATE(ts AT TIME ZONE 'America/New_York') AS dia,
+                       COUNT(*) FILTER (WHERE role = 'assistant') AS outbound,
+                       COUNT(*) FILTER (WHERE role = 'user') AS inbound
+                FROM conversations
+                WHERE ts > NOW() - ($1 || ' days')::INTERVAL
+                GROUP BY 1
+                ORDER BY 1 ASC
+            `, [days]);
+            out.daily_volume = dailyOutbound.rows;
+
+            // Totales del período
+            const totals = await pool.query(`
+                SELECT
+                    COUNT(*) FILTER (WHERE role = 'assistant') AS total_outbound,
+                    COUNT(*) FILTER (WHERE role = 'user') AS total_inbound,
+                    COUNT(DISTINCT phone) AS unique_phones
+                FROM conversations
+                WHERE ts > NOW() - ($1 || ' days')::INTERVAL
+            `, [days]);
+            out.totals = totals.rows[0];
+
+            // Conversaciones activas en ventana 24h
+            const activas = await pool.query(`
+                SELECT COUNT(DISTINCT phone) AS conv_24h_abiertas
+                FROM conversations
+                WHERE role = 'user' AND ts > NOW() - INTERVAL '24 hours'
+            `);
+            out.conv_24h_abiertas = parseInt(activas.rows[0].conv_24h_abiertas, 10);
+
+            // ============ B. EFECTIVIDAD POR USUARIO ============
+            // Quién contactó a cuántos contactos (sofia_template = template enviado)
+            const porUsuario = await pool.query(`
+                SELECT autor,
+                       COUNT(*) FILTER (WHERE tipo IN ('sofia_template', 'sofia_text')) AS mensajes_enviados,
+                       COUNT(DISTINCT contact_phone) FILTER (WHERE tipo IN ('sofia_template', 'sofia_text')) AS contactos_contactados,
+                       COUNT(*) FILTER (WHERE tipo = 'reply_human') AS respuestas_manuales,
+                       COUNT(*) FILTER (WHERE tipo = 'create') AS contactos_creados
+                FROM crm_interactions
+                WHERE ts > NOW() - ($1 || ' days')::INTERVAL
+                GROUP BY autor
+                ORDER BY mensajes_enviados DESC
+            `, [days]);
+            out.por_usuario = porUsuario.rows;
+
+            // Tasa de respuesta por usuario:
+            // contactó a X clientes, ¿cuántos de esos X respondieron?
+            const tasaRespuesta = await pool.query(`
+                WITH contactados AS (
+                    SELECT DISTINCT autor, contact_phone
+                    FROM crm_interactions
+                    WHERE tipo IN ('sofia_template', 'sofia_text')
+                      AND ts > NOW() - ($1 || ' days')::INTERVAL
+                ),
+                respondieron AS (
+                    SELECT c.autor, c.contact_phone
+                    FROM contactados c
+                    WHERE EXISTS (
+                        SELECT 1 FROM conversations conv
+                        WHERE conv.role = 'user'
+                          AND (conv.phone = c.contact_phone OR conv.phone = REPLACE(c.contact_phone, '+', ''))
+                          AND conv.ts > NOW() - ($1 || ' days')::INTERVAL
+                    )
+                )
+                SELECT c.autor,
+                       COUNT(DISTINCT c.contact_phone) AS contactados,
+                       COUNT(DISTINCT r.contact_phone) AS respondieron,
+                       CASE WHEN COUNT(DISTINCT c.contact_phone) > 0
+                            THEN ROUND(100.0 * COUNT(DISTINCT r.contact_phone) / COUNT(DISTINCT c.contact_phone), 1)
+                            ELSE 0 END AS tasa_respuesta_pct
+                FROM contactados c
+                LEFT JOIN respondieron r ON r.autor = c.autor AND r.contact_phone = c.contact_phone
+                GROUP BY c.autor
+                ORDER BY contactados DESC
+            `, [days]);
+            out.tasa_respuesta = tasaRespuesta.rows;
+
+            // ============ C. PIPELINE / FUNNEL ============
+            const funnel = await pool.query(`
+                SELECT
+                    (SELECT COUNT(*) FROM crm_contacts) AS total_contactos,
+                    (SELECT COUNT(DISTINCT contact_phone) FROM crm_interactions
+                     WHERE tipo IN ('sofia_template', 'sofia_text')
+                       AND ts > NOW() - ($1 || ' days')::INTERVAL) AS contactados_periodo,
+                    (SELECT COUNT(DISTINCT phone) FROM conversations
+                     WHERE role = 'user' AND ts > NOW() - ($1 || ' days')::INTERVAL) AS respondieron_periodo,
+                    (SELECT COUNT(DISTINCT phone) FROM conversations
+                     WHERE role = 'user'
+                       AND ts > NOW() - ($1 || ' days')::INTERVAL
+                       AND (content ILIKE '%precio%' OR content ILIKE '%cotiza%' OR content ILIKE '%stock%' OR content ILIKE '%cantidad%' OR content ILIKE '%necesito%')
+                    ) AS interesados_periodo
+            `, [days]);
+            out.funnel = funnel.rows[0];
+
+            // ============ D. RENDIMIENTO DE SOFÍA ============
+            // Conversaciones que mencionan derivación a humano vs autónomas
+            const sofiaPerf = await pool.query(`
+                WITH sofia_msgs AS (
+                    SELECT phone, content
+                    FROM conversations
+                    WHERE role = 'assistant'
+                      AND ts > NOW() - ($1 || ' days')::INTERVAL
+                )
+                SELECT
+                    COUNT(*) AS total_respuestas_sofia,
+                    COUNT(*) FILTER (WHERE content ILIKE '%nico%' OR content ILIKE '%vendedor%' OR content ILIKE '%escribi%a%' OR content ILIKE '%kyc%') AS derivaciones_humano,
+                    COUNT(DISTINCT phone) AS conversaciones_atendidas
+                FROM sofia_msgs
+            `, [days]);
+            out.sofia_perf = sofiaPerf.rows[0];
+
+            // Templates más usados
+            const templatesPop = await pool.query(`
+                SELECT
+                    SUBSTRING(detalle FROM 'Template: ([a-z0-9_]+)') AS template,
+                    COUNT(*) AS envios
+                FROM crm_interactions
+                WHERE tipo = 'sofia_template'
+                  AND ts > NOW() - ($1 || ' days')::INTERVAL
+                  AND detalle LIKE 'Template:%'
+                GROUP BY template
+                ORDER BY envios DESC
+                LIMIT 10
+            `, [days]);
+            out.templates_populares = templatesPop.rows;
+
+            // ============ E. QUALITY CONTROL ============
+            // Conversaciones donde el último mensaje es del CLIENTE (Sofía no respondió)
+            const sinRespuesta = await pool.query(`
+                WITH ultimos AS (
+                    SELECT DISTINCT ON (phone) phone, role, content, ts
+                    FROM conversations
+                    WHERE ts > NOW() - INTERVAL '24 hours'
+                    ORDER BY phone, ts DESC
+                )
+                SELECT phone, LEFT(content, 200) AS ultimo_msg, ts
+                FROM ultimos
+                WHERE role = 'user'
+                ORDER BY ts DESC
+                LIMIT 50
+            `);
+            out.sin_respuesta_sofia = sinRespuesta.rows;
+
+            // Contactos sin actividad reciente
+            const dormidos = await pool.query(`
+                SELECT COUNT(*) AS contactos_inactivos_30d
+                FROM crm_contacts
+                WHERE last_contact IS NULL OR last_contact < NOW() - INTERVAL '30 days'
+            `);
+            out.contactos_inactivos_30d = parseInt(dormidos.rows[0].contactos_inactivos_30d, 10);
+
+            out.window_days = days;
+            out.generated_at = new Date().toISOString();
+            res.json({ ok: true, report: out });
+        } catch (e) {
+            console.error('[reports/overview] err:', e.message);
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
     console.log('[dashboard-routes] mounted: ' + Object.keys(users).join(', '));
 };

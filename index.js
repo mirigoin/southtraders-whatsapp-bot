@@ -325,10 +325,22 @@ async function askClaude(phone, userText) {
   await saveMessage(phone, 'user', userText);
   const history = await loadConversation(phone);
   const messages = history.map(function(m) { return { role: m.role, content: m.content }; });
+
+  // Anti-resaludo override: si ya hay al menos un mensaje del bot en el historial,
+  // appendear instrucción final fuerte al system prompt para que NO se vuelva a presentar.
+  let systemPrompt = await buildPrompt();
+  const priorAssistantMsgs = history.filter(function(m){ return m.role === 'assistant'; });
+  if (priorAssistantMsgs.length > 0) {
+    systemPrompt += '\n\n=== CONTEXTO DE ESTA CONVERSACION ===\n' +
+      'Ya tuviste interaccion previa con este cliente en este chat (' + priorAssistantMsgs.length + ' mensaje(s) tuyo(s) en el historial).\n' +
+      'PROHIBIDO ABSOLUTO: NO te vuelvas a presentar. NO digas "Bienvenido/a a South Traders". NO digas "Soy Sophia". NO digas "distribuidor oficial Apple en Miami".\n' +
+      'Continua la conversacion natural respondiendo solo lo que el cliente esta preguntando ahora. Tono directo, breve, sin preambulo.';
+  }
+
   try {
     const resp = await axios.post(
       'https://api.anthropic.com/v1/messages',
-      { model: 'claude-haiku-4-5', max_tokens: 1024, system: await buildPrompt(), messages: messages },
+      { model: 'claude-haiku-4-5', max_tokens: 1024, system: systemPrompt, messages: messages },
       { headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 30000 }
     );
     const text = resp.data && resp.data.content && resp.data.content[0] && resp.data.content[0].text;

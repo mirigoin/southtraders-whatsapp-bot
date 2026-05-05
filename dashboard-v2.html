@@ -2,634 +2,1421 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>South Traders — Dashboard v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>South Traders — Sophia Dashboard v2</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;font-size:14px}
-header{background:#1a1a2e;color:white;padding:14px 24px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-header h1{font-size:18px;font-weight:600;flex:1}
-.dot{width:9px;height:9px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.user{font-size:12px;opacity:.7}
-.tabs{background:white;border-bottom:1px solid #e0e0e0;padding:0 24px;display:flex;gap:4px;position:sticky;top:0;z-index:10}
-.tab{padding:14px 20px;cursor:pointer;border-bottom:3px solid transparent;font-weight:500;color:#666;transition:all .15s}
-.tab:hover{color:#1a1a2e}
-.tab.active{color:#1a1a2e;border-bottom-color:#22c55e}
-.tab .badge{background:#1a1a2e;color:white;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:6px}
-main{max-width:1200px;margin:0 auto;padding:20px}
-.panel{display:none;background:white;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.panel.active{display:block}
-h2{font-size:16px;font-weight:600;margin-bottom:14px;color:#1a1a2e}
-h3{font-size:13px;font-weight:600;margin:12px 0 8px;color:#555;text-transform:uppercase;letter-spacing:.5px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-input,select,textarea{font-family:inherit;font-size:13px;padding:8px 12px;border:1px solid #ddd;border-radius:7px;flex:1;min-width:140px}
-input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a2e}
-textarea{min-height:60px;resize:vertical}
-.btn{padding:8px 16px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
-.btn-primary{background:#1a1a2e;color:white}
-.btn-primary:hover{background:#2d2d4e}
-.btn-success{background:#22c55e;color:white}
-.btn-success:hover{background:#16a34a}
-.btn-danger{background:#ef4444;color:white}
-.btn-warning{background:#f59e0b;color:white}
-.btn-ghost{background:transparent;color:#666;border:1px solid #ddd}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px}
-.stat .n{font-size:24px;font-weight:700;color:#1a1a2e}
-.stat .l{font-size:11px;color:#777;margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-table th{text-align:left;padding:10px 8px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-weight:600;font-size:11px;text-transform:uppercase;color:#666}
-table td{padding:10px 8px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
-table tr:hover{background:#fafbfc}
-.cell-edit{cursor:pointer;border-bottom:1px dashed transparent;padding:2px 4px;border-radius:4px}
-.cell-edit:hover{border-bottom-color:#1a1a2e;background:#f9fafb}
-.cell-edit.empty{color:#bbb;font-style:italic}
-.contact-input{padding:4px 6px;border:1px solid #1a1a2e;border-radius:4px;font-size:13px;width:100%}
-.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
-.tag-active{background:#dcfce7;color:#166534}
-.tag-cold{background:#fef3c7;color:#92400e}
-.tag-vip{background:#ddd6fe;color:#5b21b6}
-.toast{position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:white;padding:12px 18px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:all .25s;font-size:13px;z-index:1000;max-width:340px}
-.toast.show{opacity:1;transform:translateY(0)}
-.toast.error{background:#dc2626}
-.toast.success{background:#16a34a}
-.dropzone{border:2px dashed #d1d5db;border-radius:10px;padding:40px;text-align:center;cursor:pointer;transition:all .15s;background:#fafbfc}
-.dropzone:hover{border-color:#1a1a2e;background:#f0f2f5}
-.dropzone.over{border-color:#22c55e;background:#dcfce7}
-.dropzone input[type=file]{display:none}
-.preview-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-top:14px}
-.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
-.preview-stat{background:white;border-radius:6px;padding:10px;text-align:center}
-.preview-stat .n{font-size:20px;font-weight:700}
-.preview-stat .n.green{color:#16a34a}
-.preview-stat .n.red{color:#dc2626}
-.preview-stat .n.amber{color:#d97706}
-.preview-stat .l{font-size:11px;color:#777;margin-top:2px}
-.steps{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #e5e7eb}
-.step{flex:1;padding:12px;text-align:center;font-size:12px;color:#999;border-bottom:3px solid transparent;cursor:default}
-.step.active{color:#1a1a2e;font-weight:600;border-bottom-color:#22c55e}
-.step.done{color:#16a34a}
-.step .num{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:#e5e7eb;color:#777;margin-right:6px;font-weight:700}
-.step.active .num{background:#1a1a2e;color:white}
-.step.done .num{background:#16a34a;color:white}
-.template-card{border:1px solid #e5e7eb;border-radius:8px;padding:14px;cursor:pointer;transition:all .15s}
-.template-card:hover{border-color:#1a1a2e}
-.template-card.selected{border-color:#22c55e;background:#dcfce7}
-.template-card .name{font-weight:600;margin-bottom:4px}
-.template-card .meta{font-size:11px;color:#777;margin-bottom:6px}
-.template-card .body{font-size:12px;color:#555;background:white;padding:8px;border-radius:5px;border:1px solid #f0f0f0}
-.empty-state{text-align:center;padding:40px;color:#999}
-.progress-bar{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
-.progress-bar .fill{height:100%;background:#22c55e;transition:width .3s}
-.muted{color:#777;font-size:12px}
-@media(max-width:700px){
-.stats{grid-template-columns:repeat(2,1fr)}
-.preview-grid{grid-template-columns:repeat(2,1fr)}
-.tabs{padding:0 12px;overflow-x:auto}
-.tab{white-space:nowrap}
-}
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --border: #e2e6ec;
+    --border-2: #cdd3dc;
+    --text: #0c1729;
+    --text-2: #4a5568;
+    --text-3: #718096;
+    --primary: #0c1729;
+    --accent: #16a34a;
+    --accent-soft: #dcfce7;
+    --warn: #d97706;
+    --warn-soft: #fef3c7;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --info: #2563eb;
+    --info-soft: #dbeafe;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,.1);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  header.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--primary);
+    color: #fff;
+    border-bottom: 1px solid #000;
+  }
+  header.topbar h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  header.topbar h1 .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  header.topbar .right {
+    display: flex; align-items: center; gap: 16px;
+    font-size: 12px;
+    color: #cbd5e0;
+  }
+  header.topbar .user-pill {
+    background: rgba(255,255,255,.1);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+  }
+  nav.tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    gap: 0;
+  }
+  nav.tabs button {
+    background: none;
+    border: none;
+    padding: 14px 16px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--text-2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    display: flex; align-items: center; gap: 6px;
+  }
+  nav.tabs button:hover { color: var(--text); }
+  nav.tabs button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  nav.tabs button .badge {
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  nav.tabs button.active .badge { background: var(--accent-soft); color: var(--accent); }
+
+  main { padding: 0; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* OVERVIEW */
+  .overview-wrap { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat .num { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat .label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  /* CRM CONTACTS */
+  .crm-layout {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+    gap: 0;
+    height: calc(100vh - 110px);
+  }
+  .filters {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .filter-group { margin-bottom: 16px; }
+  .filter-group h4 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin: 0 0 6px 0;
+    font-weight: 600;
+  }
+  .filter-list { display: flex; flex-direction: column; gap: 2px; }
+  .filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: 12px;
+    user-select: none;
+  }
+  .filter-item:hover { background: var(--surface-2); color: var(--text); }
+  .filter-item.active { background: var(--primary); color: #fff; font-weight: 500; }
+  .filter-item .n { font-size: 11px; opacity: .7; }
+  .filter-clear {
+    margin-top: 4px;
+    background: none;
+    border: none;
+    color: var(--info);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 4px 0;
+    text-decoration: underline;
+  }
+  .filter-clear:hover { color: var(--primary); }
+
+  .crm-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .crm-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .crm-search {
+    flex: 1;
+    max-width: 400px;
+    position: relative;
+  }
+  .crm-search input {
+    width: 100%;
+    padding: 8px 12px 8px 32px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .crm-search input:focus { border-color: var(--info); }
+  .crm-search::before {
+    content: "🔍";
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 12px; opacity: .5;
+  }
+  .crm-actions { display: flex; gap: 8px; }
+  .btn {
+    background: var(--primary);
+    color: #fff;
+    border: 1px solid var(--primary);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn:hover { opacity: .9; }
+  .btn.secondary {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border-2);
+  }
+  .btn.accent { background: var(--accent); border-color: var(--accent); }
+  .btn.danger { background: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Table */
+  .crm-table-wrap { flex: 1; overflow: auto; background: var(--surface); }
+  table.crm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.crm-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--text-2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  table.crm-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  table.crm-table tbody tr:hover { background: var(--surface-2); }
+  table.crm-table tbody tr.selected { background: var(--info-soft); }
+  table.crm-table td {
+    padding: 9px 12px;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  td.empresa { font-weight: 500; }
+  td.empresa .sub { color: var(--text-3); font-weight: normal; font-size: 11px; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 500;
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+  .pill-cliente { background: var(--info-soft); color: var(--info); }
+  .pill-proveedor { background: #fce7f3; color: #be185d; }
+  .pill-adwords { background: #ede9fe; color: #6d28d9; }
+  .pill-gsmexchange { background: var(--warn-soft); color: var(--warn); }
+  .pill-cliente-origen { background: var(--accent-soft); color: var(--accent); }
+  .pill-activo { background: var(--accent-soft); color: var(--accent); }
+  .pill-pendiente { background: var(--surface-2); color: var(--text-2); }
+  .pill-contactado { background: var(--info-soft); color: var(--info); }
+  .pill-interesado { background: var(--warn-soft); color: var(--warn); }
+  .pill-paused { background: var(--danger-soft); color: var(--danger); }
+  .empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-3);
+  }
+
+  /* Detail panel (slide from right) */
+  .detail-panel {
+    position: fixed;
+    top: 0; right: -560px;
+    width: 540px;
+    height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    transition: right 0.25s ease;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .detail-panel.open { right: 0; }
+  .detail-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .detail-header h2 { margin: 0 0 2px 0; font-size: 16px; }
+  .detail-header .sub { color: var(--text-3); font-size: 12px; }
+  .detail-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 22px; color: var(--text-3);
+    padding: 0 4px; line-height: 1;
+  }
+  .detail-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .detail-tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 10px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .detail-tabs button.active {
+    background: var(--surface);
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  .detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+  .detail-pane { display: none; }
+  .detail-pane.active { display: block; }
+
+  /* Form fields */
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+  }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field.wide { grid-column: 1 / -1; }
+  .field label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
+    font-weight: 600;
+  }
+  .field input, .field select, .field textarea {
+    padding: 7px 9px;
+    border: 1px solid var(--border-2);
+    border-radius: 5px;
+    font: inherit;
+    font-size: 12.5px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--info);
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .field input[readonly] { background: var(--surface-2); color: var(--text-2); }
+
+  .detail-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--surface-2);
+  }
+  .save-status {
+    font-size: 11px;
+    color: var(--text-3);
+    align-self: center;
+  }
+  .save-status.success { color: var(--accent); }
+  .save-status.error { color: var(--danger); }
+
+  /* Interactions log */
+  .interaction {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .interaction:last-child { border-bottom: none; }
+  .interaction .head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--text-3);
+    margin-bottom: 3px;
+  }
+  .interaction .head .autor { font-weight: 600; color: var(--text-2); }
+  .interaction .body { font-size: 12.5px; color: var(--text); }
+  .interaction-form {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-bottom: 16px;
+    padding: 10px;
+    background: var(--surface-2);
+    border-radius: 6px;
+  }
+  .interaction-form-row { display: flex; gap: 6px; }
+  .interaction-form select, .interaction-form input {
+    padding: 6px 8px;
+    border: 1px solid var(--border-2);
+    border-radius: 4px;
+    font-size: 12px;
+    font: inherit;
+  }
+
+  /* Sofia messaging pane */
+  .sofia-pane label { display: block; margin-top: 10px; }
+  .sofia-pane select, .sofia-pane textarea {
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--border-2);
+    border-radius: 5px;
+    font: inherit;
+    font-size: 12.5px;
+    margin-top: 3px;
+  }
+  .sofia-pane .mode-toggle {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .sofia-pane .mode-toggle button {
+    flex: 1;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    font: inherit;
+  }
+  .sofia-pane .mode-toggle button.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .sofia-warning {
+    background: var(--warn-soft);
+    color: var(--warn);
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    margin-top: 8px;
+  }
+
+  /* CAMPAIGNS / OUTBOUND */
+  .panel-wrap { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 { margin: 0 0 12px 0; font-size: 15px; }
+  .panel .desc { color: var(--text-3); font-size: 12px; margin-bottom: 14px; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 6px;
+    box-shadow: var(--shadow-lg);
+    font-size: 12px;
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .2s, transform .2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--accent); }
+
+  .loader {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-3);
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
 
-<header>
-    <span class="dot"></span>
-    <h1>South Traders — Sophia Dashboard v2</h1>
-    <span class="user" id="now">--:--</span>
+<header class="topbar">
+  <h1><span class="dot"></span> South Traders — Sophia Dashboard v2</h1>
+  <div class="right">
+    <span id="clock"></span>
+    <span class="user-pill" id="userPill">…</span>
+  </div>
 </header>
 
 <nav class="tabs">
-    <div class="tab active" data-tab="overview">📊 Resumen</div>
-    <div class="tab" data-tab="contacts">👥 Contactos <span class="badge" id="badge-contacts">--</span></div>
-    <div class="tab" data-tab="conversations">💬 Conversaciones</div>
-    <div class="tab" data-tab="campaign-new">📤 Nueva campaña</div>
-    <div class="tab" data-tab="campaigns">📈 Campañas <span class="badge" id="badge-campaigns">--</span></div>
+  <button class="tab-btn active" data-tab="overview">📊 Resumen</button>
+  <button class="tab-btn" data-tab="contacts">👥 Contactos <span class="badge" id="contactsBadge">0</span></button>
+  <button class="tab-btn" data-tab="campaigns">📈 Campañas <span class="badge" id="campsBadge">0</span></button>
+  <button class="tab-btn" data-tab="newcamp">📤 Nueva campaña</button>
 </nav>
 
 <main>
-
-<!-- ====== OVERVIEW ====== -->
-<section class="panel active" id="panel-overview">
-    <h2>Vista general</h2>
-    <div class="stats">
-        <div class="stat"><div class="n" id="kpi-contacts">--</div><div class="l">Contactos</div></div>
-        <div class="stat"><div class="n" id="kpi-messages">--</div><div class="l">Mensajes (todos)</div></div>
-        <div class="stat"><div class="n" id="kpi-active">--</div><div class="l">Activos hoy</div></div>
-        <div class="stat"><div class="n" id="kpi-campaigns">--</div><div class="l">Campañas</div></div>
+  <!-- OVERVIEW -->
+  <section class="section active" id="section-overview">
+    <div class="overview-wrap">
+      <div class="stats" id="overviewStats">
+        <div class="stat"><div class="num">…</div><div class="label">Contactos</div></div>
+        <div class="stat"><div class="num">…</div><div class="label">Clientes</div></div>
+        <div class="stat"><div class="num">…</div><div class="label">Proveedores</div></div>
+        <div class="stat"><div class="num">…</div><div class="label">Sin tipo</div></div>
+      </div>
+      <div class="panel">
+        <h2>Distribución por origen</h2>
+        <div id="overviewOrigen" class="loader">Cargando…</div>
+      </div>
+      <div class="panel">
+        <h2>Top regiones</h2>
+        <div id="overviewRegion" class="loader">Cargando…</div>
+      </div>
     </div>
-    <h3>Últimas conversaciones</h3>
-    <div id="recent-conv" class="muted">Cargando...</div>
-</section>
+  </section>
 
-<!-- ====== CONTACTS ====== -->
-<section class="panel" id="panel-contacts">
-    <h2>Contactos <span class="muted" style="font-weight:400">(click en cualquier celda para editar)</span></h2>
-    <div class="row" style="margin-bottom:14px">
-        <input type="search" id="contact-search" placeholder="Buscar por nombre, teléfono o empresa...">
-        <select id="contact-filter-tier" style="flex:0 0 auto">
-            <option value="">Todos los tiers</option>
-            <option value="vip">VIP</option>
-            <option value="hot">Hot</option>
-            <option value="warm">Warm</option>
-            <option value="cold">Cold</option>
-        </select>
-    </div>
-    <div style="overflow-x:auto">
-        <table id="contacts-table">
+  <!-- CONTACTS -->
+  <section class="section" id="section-contacts">
+    <div class="crm-layout">
+      <aside class="filters" id="filters">
+        <div class="loader">Cargando filtros…</div>
+      </aside>
+      <div class="crm-main">
+        <div class="crm-toolbar">
+          <div class="crm-search">
+            <input type="text" id="searchInput" placeholder="Buscar empresa, nombre, teléfono, email…">
+          </div>
+          <div class="crm-actions">
+            <button class="btn secondary" id="newContactBtn">＋ Nuevo</button>
+            <button class="btn secondary" id="exportBtn">⤓ Export CSV</button>
+          </div>
+        </div>
+        <div class="crm-table-wrap">
+          <table class="crm-table" id="crmTable">
             <thead>
-                <tr>
-                    <th>Teléfono</th>
-                    <th>Nombre</th>
-                    <th>Empresa</th>
-                    <th>País</th>
-                    <th>Tier</th>
-                    <th>Status</th>
-                    <th>Mensajes</th>
-                    <th>Notas</th>
-                </tr>
+              <tr>
+                <th>Empresa / Nombre</th>
+                <th>Teléfono</th>
+                <th>Tipo</th>
+                <th>Origen</th>
+                <th>Región</th>
+                <th>Estado</th>
+                <th>Vendedor</th>
+                <th>Último contacto</th>
+                <th>Interacc.</th>
+              </tr>
             </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-</section>
-
-<!-- ====== CONVERSATIONS ====== -->
-<section class="panel" id="panel-conversations">
-    <h2>Conversaciones recientes</h2>
-    <p class="muted">Para gestionar conversaciones (pausar/borrar/enviar) usá el dashboard original en <a href="/dashboard">/dashboard</a>.</p>
-    <div id="conv-list" style="margin-top:14px"></div>
-</section>
-
-<!-- ====== NEW CAMPAIGN (4 STEPS) ====== -->
-<section class="panel" id="panel-campaign-new">
-    <h2>Nueva campaña de outbound</h2>
-
-    <div class="steps">
-        <div class="step active" data-step="1"><span class="num">1</span>Subir lista</div>
-        <div class="step" data-step="2"><span class="num">2</span>Elegir template</div>
-        <div class="step" data-step="3"><span class="num">3</span>Preview</div>
-        <div class="step" data-step="4"><span class="num">4</span>Confirmar y enviar</div>
-    </div>
-
-    <!-- Step 1 -->
-    <div class="step-panel" data-stepp="1">
-        <h3>1. Subir lista de clientes (CSV)</h3>
-        <p class="muted">Columnas esperadas: <code>phone, name</code> (opcional: <code>company, country</code>). Tamaño máximo 2MB.</p>
-        <div class="dropzone" id="dropzone">
-            <input type="file" id="csv-file" accept=".csv,text/csv">
-            <p>📁 Arrastrá un CSV acá o <strong>click para elegir archivo</strong></p>
-            <p class="muted" style="margin-top:6px">El sistema valida números, detecta duplicados y los marca como skipped.</p>
+            <tbody id="crmTbody">
+              <tr><td colspan="9" class="empty-state">Cargando contactos…</td></tr>
+            </tbody>
+          </table>
         </div>
-        <div id="upload-result" style="display:none"></div>
+      </div>
     </div>
+  </section>
 
-    <!-- Step 2 -->
-    <div class="step-panel" data-stepp="2" style="display:none">
-        <h3>2. Elegir template aprobado de Meta</h3>
-        <div id="templates-list" class="muted">Cargando templates...</div>
-        <div class="row" style="margin-top:14px">
-            <button class="btn btn-ghost" onclick="goStep(1)">← Atrás</button>
-            <button class="btn btn-primary" id="step2-next" onclick="goStep(3)" disabled>Siguiente →</button>
-        </div>
+  <!-- CAMPAIGNS -->
+  <section class="section" id="section-campaigns">
+    <div class="panel-wrap">
+      <div class="panel">
+        <h2>Campañas</h2>
+        <div class="desc">Historial de envíos masivos. Las campañas en curso muestran progreso en tiempo real.</div>
+        <div id="campaignsList" class="loader">Cargando…</div>
+      </div>
     </div>
+  </section>
 
-    <!-- Step 3 -->
-    <div class="step-panel" data-stepp="3" style="display:none">
-        <h3>3. Preview de la campaña</h3>
-        <div class="row">
-            <input type="text" id="campaign-name" placeholder="Nombre de la campaña (ej: Promo iPhone Mayo 2026)">
+  <!-- NEW CAMPAIGN -->
+  <section class="section" id="section-newcamp">
+    <div class="panel-wrap">
+      <div class="panel">
+        <h2>Nueva campaña outbound</h2>
+        <div class="desc">Envío masivo a contactos del CRM. Rate limit: 10 segundos entre mensajes.</div>
+
+        <div class="field" style="margin-bottom: 14px;">
+          <label>Template aprobado de Meta</label>
+          <select id="campTemplate"><option value="">Cargando…</option></select>
         </div>
-        <div id="preview-content"></div>
-        <div class="row" style="margin-top:14px">
-            <button class="btn btn-ghost" onclick="goStep(2)">← Atrás</button>
-            <button class="btn btn-primary" onclick="goStep(4)">Siguiente →</button>
+
+        <div class="field-grid" style="margin-bottom: 14px;">
+          <div class="field">
+            <label>Filtro: Tipo</label>
+            <select id="campFilterTipo">
+              <option value="">Todos</option>
+              <option value="Cliente">Cliente</option>
+              <option value="Proveedor">Proveedor</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Filtro: Origen</label>
+            <select id="campFilterOrigen"><option value="">Todos</option></select>
+          </div>
+          <div class="field">
+            <label>Filtro: Región</label>
+            <select id="campFilterRegion"><option value="">Todas</option></select>
+          </div>
+          <div class="field">
+            <label>Filtro: Estado</label>
+            <select id="campFilterEstado"><option value="">Todos</option></select>
+          </div>
         </div>
+
+        <div id="campPreview" style="padding: 10px; background: var(--surface-2); border-radius: 6px; margin-bottom: 14px; font-size: 12px;">
+          Selección: <strong>0 contactos</strong>
+        </div>
+
+        <button class="btn accent" id="campLaunchBtn" disabled>▶ Disparar campaña</button>
+      </div>
     </div>
-
-    <!-- Step 4 -->
-    <div class="step-panel" data-stepp="4" style="display:none">
-        <h3>4. Confirmar envío</h3>
-        <div class="preview-box">
-            <p><strong>⚠️ Atención:</strong> al confirmar, el sistema empezará a mandar mensajes a una velocidad de <strong>1 mensaje cada 10 segundos</strong>.</p>
-            <p class="muted" style="margin-top:6px">No se puede pausar una vez iniciado. Si Meta detecta abuso, baja la calidad del WABA o suspende el número.</p>
-            <p style="margin-top:10px" id="confirm-summary"></p>
-        </div>
-        <div class="row" style="margin-top:14px">
-            <button class="btn btn-ghost" onclick="goStep(3)">← Atrás</button>
-            <button class="btn btn-success" id="confirm-send" onclick="launchCampaign()">🚀 SÍ, ENVIAR AHORA</button>
-        </div>
-        <div id="campaign-result" style="margin-top:20px"></div>
-    </div>
-</section>
-
-<!-- ====== CAMPAIGNS HISTORY ====== -->
-<section class="panel" id="panel-campaigns">
-    <h2>Historial de campañas</h2>
-    <div id="campaigns-list" class="muted">Cargando...</div>
-</section>
-
+  </section>
 </main>
+
+<!-- Detail panel -->
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <div>
+      <h2 id="detailName">—</h2>
+      <div class="sub" id="detailPhone">—</div>
+    </div>
+    <button class="detail-close" id="detailClose">×</button>
+  </div>
+  <div class="detail-tabs">
+    <button class="detail-tab-btn active" data-pane="info">Datos</button>
+    <button class="detail-tab-btn" data-pane="log">Interacciones</button>
+    <button class="detail-tab-btn" data-pane="sofia">Contactar</button>
+  </div>
+  <div class="detail-body">
+    <!-- INFO PANE -->
+    <div class="detail-pane active" id="pane-info">
+      <div class="field-grid" id="infoGrid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- LOG PANE -->
+    <div class="detail-pane" id="pane-log">
+      <div class="interaction-form">
+        <div class="interaction-form-row">
+          <select id="newIntTipo">
+            <option value="nota">📝 Nota</option>
+            <option value="llamada">📞 Llamada</option>
+            <option value="reunion">🤝 Reunión</option>
+            <option value="email">✉️ Email</option>
+            <option value="otro">⚙️ Otro</option>
+          </select>
+          <input type="text" id="newIntDetalle" placeholder="Detalle (ej: 'Llamó preguntando por iPhone 15')" style="flex:1;">
+          <button class="btn" id="addIntBtn">＋ Agregar</button>
+        </div>
+      </div>
+      <div id="interactionsList" class="loader">Cargando…</div>
+    </div>
+
+    <!-- SOFIA PANE -->
+    <div class="detail-pane sofia-pane" id="pane-sofia">
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="template">Template aprobado</button>
+        <button class="mode-btn" data-mode="free">Texto libre</button>
+      </div>
+
+      <div id="modeTemplate">
+        <label>Template
+          <select id="sofiaTemplate"><option>Cargando…</option></select>
+        </label>
+        <label>Idioma
+          <select id="sofiaLang">
+            <option value="es_AR">Español (AR)</option>
+            <option value="es">Español</option>
+            <option value="en">English</option>
+            <option value="en_US">English (US)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="modeFree" style="display:none;">
+        <label>Mensaje
+          <textarea id="sofiaText" rows="5" placeholder="Texto libre. Solo funciona si el contacto envió un mensaje a Sofía en las últimas 24h."></textarea>
+        </label>
+        <div class="sofia-warning">⚠️ Solo funciona si el contacto inició conversación en las últimas 24h. Fuera de esa ventana, usá un template aprobado.</div>
+      </div>
+
+      <button class="btn accent" id="sofiaSendBtn" style="margin-top: 14px; width: 100%;">📤 Enviar via Sofía</button>
+    </div>
+  </div>
+  <div class="detail-footer">
+    <span class="save-status" id="saveStatus"></span>
+    <button class="btn" id="saveBtn">💾 Guardar cambios</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ============================================================
+//===========================================================================
 // STATE
-// ============================================================
+//===========================================================================
 const state = {
-    contacts: [],
-    templates: [],
-    selectedTemplate: null,
-    uploadedContacts: null,   // {valid, invalid, duplicates}
+  user: '',
+  contacts: [],
+  filtered: [],
+  facets: {},
+  filters: { tipo: null, origen: null, region: null, vendedor: null, estado: null },
+  q: '',
+  selectedPhone: null,
+  templates: [],
+  campaigns: [],
+  dirty: false,
 };
 
-// ============================================================
+//===========================================================================
 // HELPERS
-// ============================================================
-function $(s){return document.querySelector(s)}
-function $$(s){return [...document.querySelectorAll(s)]}
-function toast(msg, type='info'){
-    const t = $('#toast');
-    t.textContent = msg;
-    t.className = 'toast show ' + type;
-    setTimeout(()=>t.className='toast', 3500);
+//===========================================================================
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return [...document.querySelectorAll(sel)]; }
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
-async function api(method, url, body){
-    const opts = { method, headers: {} };
-    if (body && !(body instanceof FormData)){
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(body);
-    } else if (body instanceof FormData){
-        opts.body = body;
-    }
-    const res = await fetch(url, opts);
-    const data = await res.json().catch(()=>({ok:false,error:'respuesta no JSON'}));
-    if (!res.ok || !data.ok){
-        throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    return data;
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt)) return '—';
+  return dt.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-function escapeHtml(s){
-    if (s==null) return '';
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmtDateTime(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function pillClass(value, kind) {
+  if (!value) return 'pill';
+  const v = String(value).toLowerCase();
+  if (kind === 'tipo') return 'pill pill-' + v;
+  if (kind === 'origen') {
+    if (v === 'cliente') return 'pill pill-cliente-origen';
+    return 'pill pill-' + v;
+  }
+  if (kind === 'estado') return 'pill pill-' + v;
+  return 'pill';
+}
+function toast(msg, type) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json().catch(() => ({ ok: false, error: 'invalid json' }));
+  if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
 }
 
-// ============================================================
+//===========================================================================
+// CLOCK + USER
+//===========================================================================
+function tickClock() {
+  $('#clock').textContent = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(tickClock, 30000); tickClock();
+
+(function initUser() {
+  const meta = document.querySelector('meta[name="auth-user"]');
+  state.user = meta ? meta.content : 'anon';
+  $('#userPill').textContent = '👤 ' + state.user;
+})();
+
+//===========================================================================
 // TABS
-// ============================================================
-$$('.tab').forEach(tab => tab.addEventListener('click', () => {
-    $$('.tab').forEach(t => t.classList.remove('active'));
-    $$('.panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    const panelId = 'panel-' + tab.dataset.tab;
-    $('#' + panelId).classList.add('active');
-    if (tab.dataset.tab === 'contacts') loadContacts();
-    if (tab.dataset.tab === 'overview') loadOverview();
-    if (tab.dataset.tab === 'campaigns') loadCampaigns();
-    if (tab.dataset.tab === 'conversations') loadConversations();
-}));
+//===========================================================================
+$$('.tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    $$('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.section').forEach(s => s.classList.remove('active'));
+    $('#section-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'campaigns') loadCampaigns();
+    if (btn.dataset.tab === 'newcamp') ensureTemplatesLoaded().then(populateNewCamp);
+    if (btn.dataset.tab === 'overview') renderOverview();
+  };
+});
 
-// ============================================================
-// OVERVIEW
-// ============================================================
-async function loadOverview(){
-    try{
-        const [contacts, campaigns] = await Promise.all([
-            api('GET', '/crm/contacts/full'),
-            api('GET', '/campaigns')
-        ]);
-        $('#kpi-contacts').textContent = contacts.contacts.length;
-        $('#badge-contacts').textContent = contacts.contacts.length;
-        const totalMsgs = contacts.contacts.reduce((a,c)=>a+parseInt(c.msg_count||0,10),0);
-        $('#kpi-messages').textContent = totalMsgs;
-        const today = new Date().toISOString().slice(0,10);
-        const activeToday = contacts.contacts.filter(c => c.last_msg_ts && c.last_msg_ts.startsWith(today)).length;
-        $('#kpi-active').textContent = activeToday;
-        $('#kpi-campaigns').textContent = campaigns.campaigns.length;
-        $('#badge-campaigns').textContent = campaigns.campaigns.length;
-
-        // Recent
-        const recent = contacts.contacts.filter(c=>c.last_msg_ts).slice(0,5);
-        $('#recent-conv').innerHTML = recent.length
-            ? recent.map(c => `
-                <div style="padding:10px;border-bottom:1px solid #f0f0f0">
-                    <strong>${escapeHtml(c.name||c.phone)}</strong>
-                    <span class="muted">— ${c.msg_count} mensajes — última actividad: ${new Date(c.last_msg_ts).toLocaleString('es-AR')}</span>
-                </div>`).join('')
-            : '<p class="empty-state">Sin actividad reciente</p>';
-    } catch(e){
-        toast('Error cargando overview: '+e.message, 'error');
-    }
+//===========================================================================
+// LOAD INITIAL DATA
+//===========================================================================
+async function loadFacetsAndContacts() {
+  try {
+    const [facetsRes, contactsRes] = await Promise.all([
+      api('/crm/contacts/facets'),
+      api('/crm/contacts/full')
+    ]);
+    state.facets = facetsRes;
+    state.contacts = contactsRes.contacts;
+    state.filtered = state.contacts;
+    $('#contactsBadge').textContent = facetsRes.total;
+    renderFilters();
+    renderTable();
+    renderOverview();
+  } catch (e) {
+    toast('Error cargando contactos: ' + e.message, 'error');
+  }
 }
 
-// ============================================================
-// CONTACTS
-// ============================================================
-async function loadContacts(){
-    try{
-        const r = await api('GET', '/crm/contacts/full');
-        state.contacts = r.contacts;
-        renderContacts();
-    } catch(e){
-        toast('Error: '+e.message, 'error');
+//===========================================================================
+// FILTERS PANEL
+//===========================================================================
+function renderFilters() {
+  const f = state.facets;
+  const groups = [
+    { key: 'tipo', title: 'Tipo', items: f.tipos || [] },
+    { key: 'origen', title: 'Origen', items: f.origenes || [] },
+    { key: 'estado', title: 'Estado', items: f.estados || [] },
+    { key: 'region', title: 'Región', items: f.regiones || [] },
+    { key: 'vendedor', title: 'Vendedor', items: f.vendedores || [] },
+  ];
+  let html = '';
+  for (const g of groups) {
+    if (!g.items || g.items.length === 0) continue;
+    html += `<div class="filter-group"><h4>${g.title}</h4><div class="filter-list">`;
+    for (const item of g.items) {
+      const active = state.filters[g.key] === item.v;
+      html += `<div class="filter-item ${active ? 'active' : ''}" data-key="${g.key}" data-value="${esc(item.v)}">
+        <span>${esc(item.v)}</span><span class="n">${item.n}</span>
+      </div>`;
     }
-}
-$('#contact-search').addEventListener('input', renderContacts);
-$('#contact-filter-tier').addEventListener('change', renderContacts);
+    html += `</div></div>`;
+  }
+  html += `<button class="filter-clear" id="filtersClearBtn">Limpiar filtros</button>`;
+  $('#filters').innerHTML = html;
 
-function renderContacts(){
-    const q = ($('#contact-search').value||'').toLowerCase();
-    const tier = $('#contact-filter-tier').value;
-    const filtered = state.contacts.filter(c => {
-        if (tier && c.tier !== tier) return false;
-        if (!q) return true;
-        return (c.phone||'').includes(q) || (c.name||'').toLowerCase().includes(q) || (c.company||'').toLowerCase().includes(q);
-    });
-    const tbody = $('#contacts-table tbody');
-    if (!filtered.length){
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Sin contactos</td></tr>';
-        return;
-    }
-    tbody.innerHTML = filtered.map(c => `
-        <tr data-phone="${escapeHtml(c.phone)}">
-            <td>+${escapeHtml(c.phone)}</td>
-            <td><span class="cell-edit ${!c.name?'empty':''}" data-field="name">${escapeHtml(c.name) || 'sin nombre'}</span></td>
-            <td><span class="cell-edit ${!c.company?'empty':''}" data-field="company">${escapeHtml(c.company) || '—'}</span></td>
-            <td><span class="cell-edit ${!c.country?'empty':''}" data-field="country">${escapeHtml(c.country) || '—'}</span></td>
-            <td><span class="cell-edit" data-field="tier">${c.tier ? `<span class="tag tag-${c.tier}">${escapeHtml(c.tier)}</span>` : '<span class="muted">—</span>'}</span></td>
-            <td><span class="cell-edit" data-field="status">${c.status ? `<span class="tag tag-${c.status==='active'?'active':'cold'}">${escapeHtml(c.status)}</span>` : '<span class="muted">—</span>'}</span></td>
-            <td>${c.msg_count||0}</td>
-            <td><span class="cell-edit ${!c.notes?'empty':''}" data-field="notes" style="max-width:200px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.notes) || '—'}</span></td>
-        </tr>
-    `).join('');
-}
-
-// Click-to-edit
-document.addEventListener('click', async (e) => {
-    if (!e.target.classList.contains('cell-edit')) return;
-    const span = e.target;
-    if (span.querySelector('input')) return;
-    const tr = span.closest('tr');
-    const phone = tr.dataset.phone;
-    const field = span.dataset.field;
-    const contact = state.contacts.find(c => c.phone === phone);
-    const currentVal = contact[field] || '';
-
-    const input = document.createElement('input');
-    input.value = currentVal;
-    input.className = 'contact-input';
-    span.innerHTML = '';
-    span.appendChild(input);
-    input.focus();
-    input.select();
-
-    const save = async () => {
-        const newVal = input.value.trim();
-        if (newVal === currentVal){
-            renderContacts();
-            return;
-        }
-        try{
-            await api('PATCH', `/crm/contacts/${phone}`, { [field]: newVal });
-            contact[field] = newVal;
-            toast('Guardado', 'success');
-            renderContacts();
-        } catch(err){
-            toast('Error guardando: '+err.message, 'error');
-            renderContacts();
-        }
+  $$('#filters .filter-item').forEach(el => {
+    el.onclick = () => {
+      const k = el.dataset.key;
+      const v = el.dataset.value;
+      state.filters[k] = state.filters[k] === v ? null : v;
+      applyFilters();
     };
-    input.addEventListener('blur', save);
-    input.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') input.blur();
-        if (ev.key === 'Escape') renderContacts();
-    });
+  });
+  $('#filtersClearBtn').onclick = () => {
+    Object.keys(state.filters).forEach(k => state.filters[k] = null);
+    state.q = '';
+    $('#searchInput').value = '';
+    applyFilters();
+    renderFilters();
+  };
+}
+
+function applyFilters() {
+  const f = state.filters;
+  const q = state.q.toLowerCase();
+  state.filtered = state.contacts.filter(c => {
+    if (f.tipo && c.tipo !== f.tipo) return false;
+    if (f.origen && c.origen !== f.origen) return false;
+    if (f.region && c.region !== f.region) return false;
+    if (f.vendedor && c.vendedor !== f.vendedor) return false;
+    if (f.estado && c.status !== f.estado) return false;
+    if (q) {
+      const hay = [c.company, c.name, c.phone, c.email, c.ubicacion].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  renderTable();
+  renderFilters();
+}
+
+//===========================================================================
+// TABLE
+//===========================================================================
+function renderTable() {
+  const rows = state.filtered;
+  const tbody = $('#crmTbody');
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No se encontraron contactos con esos filtros</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(c => {
+    const sel = c.phone === state.selectedPhone ? ' selected' : '';
+    const empresa = c.company || c.name || '<span style="color:var(--text-3)">(sin nombre)</span>';
+    const sub = c.company && c.name ? `<div class="sub">${esc(c.name)}</div>` : '';
+    const phoneClean = c.phone && c.phone.startsWith('__nophone') ? '<em style="color:var(--text-3)">sin tel</em>' : esc(c.phone);
+    return `<tr class="${sel}" data-phone="${esc(c.phone)}">
+      <td class="empresa">${esc(empresa)}${sub}</td>
+      <td>${phoneClean}</td>
+      <td>${c.tipo ? `<span class="${pillClass(c.tipo, 'tipo')}">${esc(c.tipo)}</span>` : ''}</td>
+      <td>${c.origen ? `<span class="${pillClass(c.origen, 'origen')}">${esc(c.origen)}</span>` : ''}</td>
+      <td>${esc(c.region || '')}</td>
+      <td>${c.status ? `<span class="${pillClass(c.status, 'estado')}">${esc(c.status)}</span>` : ''}</td>
+      <td>${esc(c.vendedor || '')}</td>
+      <td>${fmtDate(c.last_contact)}</td>
+      <td style="text-align:center;color:var(--text-3)">${c.interactions_count || 0}</td>
+    </tr>`;
+  }).join('');
+
+  $$('#crmTbody tr').forEach(tr => {
+    tr.onclick = () => openDetail(tr.dataset.phone);
+  });
+}
+
+//===========================================================================
+// DETAIL PANEL
+//===========================================================================
+const detailPanel = $('#detailPanel');
+$('#detailClose').onclick = closeDetail;
+function closeDetail() {
+  detailPanel.classList.remove('open');
+  state.selectedPhone = null;
+  state.dirty = false;
+  $('#saveStatus').textContent = '';
+  renderTable();
+}
+
+$$('.detail-tab-btn').forEach(b => {
+  b.onclick = () => {
+    $$('.detail-tab-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    $$('.detail-pane').forEach(p => p.classList.remove('active'));
+    $('#pane-' + b.dataset.pane).classList.add('active');
+    if (b.dataset.pane === 'log') loadInteractions();
+    if (b.dataset.pane === 'sofia') ensureTemplatesLoaded().then(populateSofiaTemplates);
+  };
 });
 
-// ============================================================
-// CONVERSATIONS (preview)
-// ============================================================
-async function loadConversations(){
-    try{
-        const r = await fetch('/conversations').then(r=>r.json());
-        const byPhone = {};
-                Object.entries(r.conversations || {}).forEach(([phone, conv]) => (conv.messages || []).forEach(m => {
-                        if (!byPhone[phone]) byPhone[phone] = [];
-                        byPhone[phone].push({...m, phone});
-                }));
-        const list = Object.entries(byPhone)
-            .map(([phone, msgs]) => ({phone, count: msgs.length, last: msgs[msgs.length-1]}))
-            .sort((a,b) => new Date(b.last.ts) - new Date(a.last.ts))
-            .slice(0,20);
-        $('#conv-list').innerHTML = list.map(c => `
-            <div style="padding:12px;border-bottom:1px solid #f0f0f0">
-                <strong>+${escapeHtml(c.phone)}</strong>
-                <span class="muted"> · ${c.count} mensajes · ${new Date(c.last.ts).toLocaleString('es-AR')}</span>
-                <div class="muted" style="margin-top:4px;max-width:600px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.last.content || '').substring(0,150)}</div>
-            </div>`).join('') || '<p class="empty-state">Sin conversaciones</p>';
-    } catch(e){
-        $('#conv-list').innerHTML = '<p class="empty-state">Error cargando: '+e.message+'</p>';
-    }
+async function openDetail(phone) {
+  const c = state.contacts.find(x => x.phone === phone);
+  if (!c) return;
+  state.selectedPhone = phone;
+  state.dirty = false;
+  $('#saveStatus').textContent = '';
+  $('#detailName').textContent = c.company || c.name || '(sin nombre)';
+  $('#detailPhone').textContent = phone.startsWith('__nophone') ? 'Sin teléfono' : phone;
+  // Reset to info tab
+  $$('.detail-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.pane === 'info'));
+  $$('.detail-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-info'));
+  renderInfoForm(c);
+  detailPanel.classList.add('open');
+  renderTable();
 }
 
-// ============================================================
-// NEW CAMPAIGN — STEPS
-// ============================================================
-let currentStep = 1;
-function goStep(n){
-    currentStep = n;
-    $$('.step').forEach(s => {
-        const sn = parseInt(s.dataset.step,10);
-        s.classList.toggle('active', sn === n);
-        s.classList.toggle('done', sn < n);
+function fieldHTML(label, name, value, type, options) {
+  type = type || 'text';
+  if (type === 'select') {
+    const opts = (options || []).map(o => `<option value="${esc(o)}" ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('');
+    return `<div class="field"><label>${label}</label><select name="${name}"><option value=""></option>${opts}</select></div>`;
+  }
+  if (type === 'textarea') {
+    return `<div class="field wide"><label>${label}</label><textarea name="${name}">${esc(value || '')}</textarea></div>`;
+  }
+  return `<div class="field"><label>${label}</label><input type="${type}" name="${name}" value="${esc(value || '')}"></div>`;
+}
+
+function renderInfoForm(c) {
+  const facets = state.facets;
+  const tipoOpts = ['Cliente', 'Proveedor'];
+  const origenOpts = ['adwords', 'gsmexchange', 'cliente', 'web', 'instagram', 'referido', 'manual'];
+  const estadoOpts = ['Activo', 'Contactado', 'Interesado', 'Pendiente'];
+  const regionOpts = (facets.regiones || []).map(r => r.v);
+  const vendedorOpts = ['Marcelo', 'Nico', 'Santiago'];
+
+  const html = `
+    ${fieldHTML('Empresa', 'company', c.company)}
+    ${fieldHTML('Nombre persona', 'name', c.name)}
+    ${fieldHTML('Email', 'email', c.email, 'email')}
+    ${fieldHTML('Ubicación', 'ubicacion', c.ubicacion)}
+    ${fieldHTML('Tipo', 'tipo', c.tipo, 'select', tipoOpts)}
+    ${fieldHTML('Origen', 'origen', c.origen, 'select', origenOpts)}
+    ${fieldHTML('Fuente', 'fuente', c.fuente)}
+    ${fieldHTML('Región', 'region', c.region, 'select', regionOpts)}
+    ${fieldHTML('Estado', 'status', c.status, 'select', estadoOpts)}
+    ${fieldHTML('Vendedor', 'vendedor', c.vendedor, 'select', vendedorOpts)}
+    ${fieldHTML('Tier', 'tier', c.tier, 'select', ['tier1', 'tier2', 'tier3'])}
+    <div class="field"><label>Creado</label><input type="text" value="${fmtDate(c.created_at)}" readonly></div>
+    ${fieldHTML('Respuesta', 'respuesta', c.respuesta, 'textarea')}
+    ${fieldHTML('Feedback / Próximos pasos', 'feedback', c.feedback, 'textarea')}
+    ${fieldHTML('Nota de compra', 'nota_compra', c.nota_compra, 'textarea')}
+    ${fieldHTML('Notas internas', 'notes', c.notes, 'textarea')}
+  `;
+  $('#infoGrid').innerHTML = html;
+
+  // Listen for changes
+  $$('#infoGrid input, #infoGrid select, #infoGrid textarea').forEach(el => {
+    el.oninput = () => { state.dirty = true; $('#saveStatus').textContent = 'Cambios sin guardar'; $('#saveStatus').className = 'save-status'; };
+  });
+}
+
+$('#saveBtn').onclick = async () => {
+  if (!state.selectedPhone) return;
+  const data = {};
+  $$('#infoGrid input, #infoGrid select, #infoGrid textarea').forEach(el => {
+    if (el.readOnly) return;
+    const name = el.name;
+    if (!name) return;
+    const v = el.value.trim();
+    data[name] = v || null;
+  });
+  $('#saveBtn').disabled = true;
+  $('#saveStatus').textContent = 'Guardando…';
+  try {
+    const r = await api('/crm/contacts/' + encodeURIComponent(state.selectedPhone), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     });
-    $$('.step-panel').forEach(p => {
-        p.style.display = parseInt(p.dataset.stepp,10) === n ? 'block' : 'none';
+    // Update local state
+    const idx = state.contacts.findIndex(x => x.phone === state.selectedPhone);
+    if (idx >= 0) state.contacts[idx] = { ...state.contacts[idx], ...r.contact };
+    state.dirty = false;
+    $('#saveStatus').textContent = '✓ Guardado';
+    $('#saveStatus').className = 'save-status success';
+    applyFilters();
+  } catch (e) {
+    $('#saveStatus').textContent = 'Error: ' + e.message;
+    $('#saveStatus').className = 'save-status error';
+  } finally {
+    $('#saveBtn').disabled = false;
+  }
+};
+
+//===========================================================================
+// INTERACTIONS LOG
+//===========================================================================
+async function loadInteractions() {
+  if (!state.selectedPhone) return;
+  $('#interactionsList').innerHTML = '<div class="loader">Cargando…</div>';
+  try {
+    const r = await api('/crm/interactions/' + encodeURIComponent(state.selectedPhone));
+    if (r.interactions.length === 0) {
+      $('#interactionsList').innerHTML = '<div class="empty-state" style="padding:20px;font-size:12px;">Sin interacciones aún</div>';
+      return;
+    }
+    $('#interactionsList').innerHTML = r.interactions.map(i => `
+      <div class="interaction">
+        <div class="head">
+          <span class="autor">${esc(i.autor)}</span>
+          <span>${fmtDateTime(i.ts)}</span>
+        </div>
+        <div class="body">
+          <span class="pill" style="margin-right:6px;">${esc(i.tipo)}</span>
+          ${esc(i.detalle || '')}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    $('#interactionsList').innerHTML = '<div class="empty-state">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+$('#addIntBtn').onclick = async () => {
+  if (!state.selectedPhone) return;
+  const tipo = $('#newIntTipo').value;
+  const detalle = $('#newIntDetalle').value.trim();
+  if (!detalle) { toast('Escribí un detalle', 'error'); return; }
+  $('#addIntBtn').disabled = true;
+  try {
+    await api('/crm/interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: state.selectedPhone, tipo, detalle })
     });
-    if (n === 2 && state.templates.length === 0) loadTemplates();
-    if (n === 3) renderPreview();
-    if (n === 4) renderConfirm();
-}
+    $('#newIntDetalle').value = '';
+    toast('Interacción agregada', 'success');
+    loadInteractions();
+    // bump count locally
+    const c = state.contacts.find(x => x.phone === state.selectedPhone);
+    if (c) c.interactions_count = (c.interactions_count || 0) + 1;
+    renderTable();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    $('#addIntBtn').disabled = false;
+  }
+};
 
-// Step 1: upload
-const dz = $('#dropzone');
-dz.addEventListener('click', () => $('#csv-file').click());
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-dz.addEventListener('drop', e => {
-    e.preventDefault();
-    dz.classList.remove('over');
-    if (e.dataTransfer.files.length) handleCsv(e.dataTransfer.files[0]);
+//===========================================================================
+// SOFIA MESSAGING
+//===========================================================================
+let sofiaMode = 'template';
+$$('.mode-btn').forEach(b => {
+  b.onclick = () => {
+    $$('.mode-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    sofiaMode = b.dataset.mode;
+    $('#modeTemplate').style.display = sofiaMode === 'template' ? 'block' : 'none';
+    $('#modeFree').style.display = sofiaMode === 'free' ? 'block' : 'none';
+  };
 });
-$('#csv-file').addEventListener('change', e => {
-    if (e.target.files.length) handleCsv(e.target.files[0]);
-});
 
-async function handleCsv(file){
-    if (!file.name.match(/\.csv$/i)){
-        toast('Solo archivos .csv', 'error');
-        return;
+async function ensureTemplatesLoaded() {
+  if (state.templates.length > 0) return;
+  try {
+    const r = await api('/templates');
+    state.templates = r.templates || [];
+  } catch (e) {
+    toast('No se pudieron cargar templates: ' + e.message, 'error');
+  }
+}
+
+function populateSofiaTemplates() {
+  const sel = $('#sofiaTemplate');
+  if (state.templates.length === 0) {
+    sel.innerHTML = '<option>Sin templates aprobados</option>';
+    return;
+  }
+  sel.innerHTML = state.templates.map(t => `<option value="${esc(t.name)}" data-lang="${esc(t.language)}">${esc(t.name)} (${esc(t.language)})</option>`).join('');
+  // Auto-set language when template changes
+  sel.onchange = () => {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.lang) $('#sofiaLang').value = opt.dataset.lang;
+  };
+  if (sel.options[0]) { sel.selectedIndex = 0; sel.onchange(); }
+}
+
+$('#sofiaSendBtn').onclick = async () => {
+  if (!state.selectedPhone) return;
+  $('#sofiaSendBtn').disabled = true;
+  try {
+    let body;
+    if (sofiaMode === 'template') {
+      const tpl = $('#sofiaTemplate').value;
+      const lang = $('#sofiaLang').value;
+      if (!tpl) { toast('Elegí un template', 'error'); $('#sofiaSendBtn').disabled = false; return; }
+      body = { mode: 'template', templateName: tpl, language: lang };
+    } else {
+      const text = $('#sofiaText').value.trim();
+      if (!text) { toast('Escribí un mensaje', 'error'); $('#sofiaSendBtn').disabled = false; return; }
+      body = { mode: 'free', text };
     }
-    const fd = new FormData();
-    fd.append('file', file);
-    try{
-        const r = await api('POST', '/upload-contacts', fd);
-        state.uploadedContacts = r;
-        const html = `
-            <div class="preview-box">
-                <div class="preview-grid">
-                    <div class="preview-stat"><div class="n green">${r.stats.valid}</div><div class="l">Válidos</div></div>
-                    <div class="preview-stat"><div class="n amber">${r.stats.duplicates}</div><div class="l">Duplicados (skipped)</div></div>
-                    <div class="preview-stat"><div class="n red">${r.stats.invalid}</div><div class="l">Inválidos</div></div>
-                </div>
-                ${r.invalid.length ? `<details><summary class="muted">Ver inválidos</summary><pre style="font-size:11px;background:white;padding:8px;border-radius:4px;margin-top:6px">${escapeHtml(JSON.stringify(r.invalid.slice(0,20), null, 2))}</pre></details>` : ''}
-                ${r.duplicates.length ? `<details style="margin-top:6px"><summary class="muted">Ver duplicados</summary><pre style="font-size:11px;background:white;padding:8px;border-radius:4px;margin-top:6px">${escapeHtml(JSON.stringify(r.duplicates.slice(0,20), null, 2))}</pre></details>` : ''}
-                ${r.stats.valid ? `<button class="btn btn-primary" style="margin-top:14px" onclick="goStep(2)">Continuar con ${r.stats.valid} contactos →</button>` : '<p class="muted" style="margin-top:14px">No hay contactos válidos para enviar.</p>'}
-            </div>`;
-        $('#upload-result').style.display = 'block';
-        $('#upload-result').innerHTML = html;
-    } catch(e){
-        toast('Error: '+e.message, 'error');
+    await api('/crm/contact/' + encodeURIComponent(state.selectedPhone) + '/sofia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    toast('Mensaje enviado ✓', 'success');
+    if (sofiaMode === 'free') $('#sofiaText').value = '';
+    // bump last_contact locally
+    const c = state.contacts.find(x => x.phone === state.selectedPhone);
+    if (c) { c.last_contact = new Date().toISOString(); c.interactions_count = (c.interactions_count || 0) + 1; }
+    renderTable();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    $('#sofiaSendBtn').disabled = false;
+  }
+};
+
+//===========================================================================
+// SEARCH
+//===========================================================================
+let searchTimer;
+$('#searchInput').oninput = e => {
+  state.q = e.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 200);
+};
+
+//===========================================================================
+// NEW CONTACT
+//===========================================================================
+$('#newContactBtn').onclick = async () => {
+  const phone = prompt('Teléfono del nuevo contacto (con código país, ej: +5491164748790):');
+  if (!phone) return;
+  const company = prompt('Empresa o nombre:');
+  if (!company) return;
+  try {
+    await api('/crm/contacts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phone.trim(), company: company.trim(), origen: 'manual' })
+    });
+    toast('Contacto creado ✓', 'success');
+    loadFacetsAndContacts();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+};
+
+//===========================================================================
+// EXPORT CSV
+//===========================================================================
+$('#exportBtn').onclick = () => {
+  const cols = ['phone', 'company', 'name', 'email', 'tipo', 'origen', 'region', 'ubicacion', 'status', 'vendedor', 'last_contact'];
+  const rows = state.filtered.map(c => cols.map(k => {
+    const v = c[k];
+    if (v === null || v === undefined) return '';
+    return '"' + String(v).replace(/"/g, '""') + '"';
+  }).join(','));
+  const csv = cols.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'crm_export_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+};
+
+//===========================================================================
+// CAMPAIGNS LIST
+//===========================================================================
+async function loadCampaigns() {
+  $('#campaignsList').innerHTML = '<div class="loader">Cargando…</div>';
+  try {
+    const r = await api('/campaigns');
+    state.campaigns = r.campaigns;
+    $('#campsBadge').textContent = r.campaigns.filter(c => c.status === 'running').length;
+    if (r.campaigns.length === 0) {
+      $('#campaignsList').innerHTML = '<div class="empty-state">No hay campañas todavía</div>';
+      return;
     }
+    $('#campaignsList').innerHTML = r.campaigns.map(c => `
+      <div style="border-bottom: 1px solid var(--border); padding: 12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong>${esc(c.templateName)}</strong>
+            <span class="pill" style="margin-left:8px;">${esc(c.status)}</span>
+            <div style="font-size: 11px; color: var(--text-3); margin-top:2px;">
+              ${esc(c.createdBy)} · ${fmtDateTime(c.createdAt)}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size: 13px;"><strong>${c.sent}/${c.total}</strong> enviados</div>
+            <div style="font-size: 11px; color: var(--danger)">${c.failed} fallaron</div>
+          </div>
+        </div>
+        ${c.errors.length ? `<details style="margin-top:6px;font-size:11px;"><summary style="cursor:pointer;color:var(--text-3);">Ver errores (${c.errors.length})</summary><div style="padding:6px 0;font-family:monospace;font-size:10.5px;">${c.errors.slice(0,5).map(e => esc(e.phone || '?') + ': ' + esc(e.error)).join('<br>')}${c.errors.length > 5 ? '<br>… y ' + (c.errors.length - 5) + ' más' : ''}</div></details>` : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    $('#campaignsList').innerHTML = '<div class="empty-state">Error: ' + esc(e.message) + '</div>';
+  }
 }
 
-// Step 2: templates
-async function loadTemplates(){
-    try{
-        const r = await api('GET', '/templates');
-        state.templates = r.templates;
-        const list = $('#templates-list');
-        if (!r.templates.length){
-            list.innerHTML = '<p class="empty-state">No hay templates aprobados</p>';
-            return;
-        }
-        list.innerHTML = r.templates.map((t,i) => {
-            const body = (t.components||[]).find(c => c.type === 'BODY')?.text || '(sin body)';
-            return `<div class="template-card" data-idx="${i}">
-                <div class="name">${escapeHtml(t.name)}</div>
-                <div class="meta">${escapeHtml(t.language)} · ${escapeHtml(t.category)} · ${escapeHtml(t.status)}</div>
-                <div class="body">${escapeHtml(body)}</div>
-            </div>`;
-        }).join('');
-        $$('.template-card').forEach(card => card.addEventListener('click', () => {
-            $$('.template-card').forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            state.selectedTemplate = state.templates[parseInt(card.dataset.idx,10)];
-            $('#step2-next').disabled = false;
-        }));
-    } catch(e){
-        $('#templates-list').innerHTML = '<p class="empty-state">Error: '+escapeHtml(e.message)+'</p>';
-    }
+//===========================================================================
+// NEW CAMPAIGN
+//===========================================================================
+function populateNewCamp() {
+  // Templates
+  const tplSel = $('#campTemplate');
+  if (state.templates.length === 0) {
+    tplSel.innerHTML = '<option value="">Sin templates aprobados</option>';
+  } else {
+    tplSel.innerHTML = '<option value="">— Elegí un template —</option>' + state.templates.map(t =>
+      `<option value="${esc(t.name)}" data-lang="${esc(t.language)}">${esc(t.name)} (${esc(t.language)})</option>`
+    ).join('');
+  }
+
+  // Origen filter options
+  const origens = (state.facets.origenes || []).map(o => o.v);
+  $('#campFilterOrigen').innerHTML = '<option value="">Todos</option>' + origens.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+
+  // Region
+  const regions = (state.facets.regiones || []).map(r => r.v);
+  $('#campFilterRegion').innerHTML = '<option value="">Todas</option>' + regions.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+
+  // Estado
+  const estados = (state.facets.estados || []).map(e => e.v);
+  $('#campFilterEstado').innerHTML = '<option value="">Todos</option>' + estados.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+
+  // Recompute preview on changes
+  ['campTemplate', 'campFilterTipo', 'campFilterOrigen', 'campFilterRegion', 'campFilterEstado'].forEach(id => {
+    $('#' + id).onchange = updateCampPreview;
+  });
+  updateCampPreview();
 }
 
-// Step 3: preview
-function renderPreview(){
-    const c = state.uploadedContacts;
-    const t = state.selectedTemplate;
-    if (!c || !t){ goStep(1); return; }
-    const body = (t.components||[]).find(x => x.type === 'BODY')?.text || '';
-    const sample = c.valid[0] || {phone:'?', name:'Cliente'};
-    const sampleRendered = body
-        .replace(/\{\{1\}\}/g, sample.name || 'Cliente')
-        .replace(/\{\{2\}\}/g, sample.company || '');
-    $('#preview-content').innerHTML = `
-        <div class="preview-box">
-            <p><strong>Template:</strong> ${escapeHtml(t.name)} (${escapeHtml(t.language)})</p>
-            <p><strong>Destinatarios:</strong> ${c.valid.length} contactos</p>
-            <p><strong>Tiempo estimado:</strong> ~${Math.ceil(c.valid.length * 10 / 60)} minutos (1 msg cada 10s)</p>
-            <h3 style="margin-top:14px">Preview del primer mensaje (a +${escapeHtml(sample.phone)}):</h3>
-            <div style="background:#dcfce7;padding:14px;border-radius:8px;margin-top:8px;white-space:pre-wrap">${escapeHtml(sampleRendered)}</div>
-        </div>`;
+function getCampFilter() {
+  return {
+    tipo: $('#campFilterTipo').value || null,
+    origen: $('#campFilterOrigen').value || null,
+    region: $('#campFilterRegion').value || null,
+    estado: $('#campFilterEstado').value || null,
+  };
 }
 
-// Step 4: confirm
-function renderConfirm(){
-    const c = state.uploadedContacts;
-    const t = state.selectedTemplate;
-    const name = $('#campaign-name').value.trim() || `Campaña ${new Date().toISOString().slice(0,16)}`;
-    $('#confirm-summary').innerHTML = `
-        <strong>Campaña:</strong> ${escapeHtml(name)}<br>
-        <strong>Template:</strong> ${escapeHtml(t.name)}<br>
-        <strong>Total:</strong> ${c.valid.length} mensajes<br>
-        <strong>Duración:</strong> ~${Math.ceil(c.valid.length * 10 / 60)} minutos
-    `;
+function updateCampPreview() {
+  const f = getCampFilter();
+  const matched = state.contacts.filter(c => {
+    if (c.phone && c.phone.startsWith('__nophone')) return false;
+    if (c.paused) return false;
+    if (f.tipo && c.tipo !== f.tipo) return false;
+    if (f.origen && c.origen !== f.origen) return false;
+    if (f.region && c.region !== f.region) return false;
+    if (f.estado && c.status !== f.estado) return false;
+    return true;
+  });
+  const tpl = $('#campTemplate').value;
+  const eta = Math.ceil(matched.length * 10 / 60);
+  $('#campPreview').innerHTML = `Selección: <strong>${matched.length} contactos</strong>` +
+    (matched.length > 0 ? ` · ETA aprox: <strong>${eta} min</strong>` : '');
+  $('#campLaunchBtn').disabled = !tpl || matched.length === 0;
 }
 
-async function launchCampaign(){
-    const c = state.uploadedContacts;
-    const t = state.selectedTemplate;
-    const name = $('#campaign-name').value.trim() || `Campaña ${new Date().toISOString().slice(0,16)}`;
-    const btn = $('#confirm-send');
-    btn.disabled = true;
-    btn.textContent = 'Enviando...';
-    try{
-        const r = await api('POST', '/campaigns', {
-            name,
-            templateName: t.name,
-            languageCode: t.language,
-            variables: ['{{NAME}}'],   // variable 1 = nombre del contacto
-            contacts: c.valid,
-            confirm: true
-        });
-        $('#campaign-result').innerHTML = `
-            <div class="preview-box" style="background:#dcfce7;border-color:#16a34a">
-                <h3>✅ Campaña iniciada (ID ${r.campaignId})</h3>
-                <p>Se están enviando ${r.queued} mensajes. Tiempo estimado: ${Math.ceil(r.estimatedSeconds/60)} minutos.</p>
-                <p><a href="/dashboard/v2#campaigns" onclick="$$('.tab[data-tab=campaigns]')[0].click();return false;">Ver progreso en pestaña Campañas →</a></p>
-            </div>`;
-        toast('Campaña iniciada', 'success');
-    } catch(e){
-        toast('Error: '+e.message, 'error');
-        btn.disabled = false;
-        btn.textContent = '🚀 SÍ, ENVIAR AHORA';
-    }
+$('#campLaunchBtn').onclick = async () => {
+  const tplName = $('#campTemplate').value;
+  if (!tplName) return;
+  const tplOpt = $('#campTemplate').options[$('#campTemplate').selectedIndex];
+  const lang = tplOpt.dataset.lang || 'es_AR';
+  const filter = getCampFilter();
+
+  const matched = state.contacts.filter(c => {
+    if (c.phone && c.phone.startsWith('__nophone')) return false;
+    if (c.paused) return false;
+    if (filter.tipo && c.tipo !== filter.tipo) return false;
+    if (filter.origen && c.origen !== filter.origen) return false;
+    if (filter.region && c.region !== filter.region) return false;
+    if (filter.estado && c.status !== filter.estado) return false;
+    return true;
+  });
+  if (!confirm(`Disparar campaña "${tplName}" a ${matched.length} contactos? ETA ${Math.ceil(matched.length * 10 / 60)} min.`)) return;
+
+  $('#campLaunchBtn').disabled = true;
+  try {
+    const r = await api('/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateName: tplName, language: lang, filter })
+    });
+    toast(`Campaña iniciada: ${r.queued} mensajes encolados`, 'success');
+    // Switch to campaigns tab
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'campaigns'));
+    $$('.section').forEach(s => s.classList.toggle('active', s.id === 'section-campaigns'));
+    loadCampaigns();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    $('#campLaunchBtn').disabled = false;
+  }
+};
+
+//===========================================================================
+// OVERVIEW
+//===========================================================================
+function renderOverview() {
+  const c = state.contacts;
+  if (c.length === 0) return;
+  const clientes = c.filter(x => x.tipo === 'Cliente').length;
+  const proveedores = c.filter(x => x.tipo === 'Proveedor').length;
+  const sinTipo = c.filter(x => !x.tipo).length;
+
+  $('#overviewStats').innerHTML = `
+    <div class="stat"><div class="num">${c.length}</div><div class="label">Contactos</div></div>
+    <div class="stat"><div class="num">${clientes}</div><div class="label">Clientes</div></div>
+    <div class="stat"><div class="num">${proveedores}</div><div class="label">Proveedores</div></div>
+    <div class="stat"><div class="num">${sinTipo}</div><div class="label">Sin tipo</div></div>
+  `;
+
+  // Distribución por origen
+  const byOrigen = {};
+  c.forEach(x => { const k = x.origen || '(sin origen)'; byOrigen[k] = (byOrigen[k] || 0) + 1; });
+  const total = c.length;
+  const orig = Object.entries(byOrigen).sort((a, b) => b[1] - a[1]);
+  $('#overviewOrigen').innerHTML = orig.map(([k, v]) => {
+    const pct = (v / total * 100).toFixed(0);
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span>${esc(k)}</span><span style="color:var(--text-3)">${v} (${pct}%)</span>
+      </div>
+      <div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:var(--accent);"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Top regiones
+  const byRegion = {};
+  c.forEach(x => { if (!x.region) return; byRegion[x.region] = (byRegion[x.region] || 0) + 1; });
+  const reg = Object.entries(byRegion).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  $('#overviewRegion').innerHTML = reg.map(([k, v]) => {
+    const pct = (v / total * 100).toFixed(0);
+    return `<div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+        <span>${esc(k)}</span><span style="color:var(--text-3)">${v}</span>
+      </div>
+      <div style="height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:var(--info);"></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-// ============================================================
-// CAMPAIGNS HISTORY
-// ============================================================
-async function loadCampaigns(){
-    try{
-        const r = await api('GET', '/campaigns');
-        if (!r.campaigns.length){
-            $('#campaigns-list').innerHTML = '<p class="empty-state">Aún no hay campañas. Creá la primera en "Nueva campaña".</p>';
-            return;
-        }
-        $('#campaigns-list').innerHTML = r.campaigns.map(c => {
-            const total = parseInt(c.actually_sent||0,10) + parseInt(c.actually_failed||0,10) + parseInt(c.still_pending||0,10);
-            const pct = total ? Math.round(100 * parseInt(c.actually_sent||0,10) / total) : 0;
-            const statusColor = c.status === 'completed' ? '#16a34a' : c.status === 'running' ? '#f59e0b' : c.status === 'aborted_rate_limit' ? '#dc2626' : '#777';
-            return `
-                <div style="padding:14px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:10px">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                        <div>
-                            <strong>${escapeHtml(c.name)}</strong>
-                            <span class="muted"> · #${c.id} · ${new Date(c.created_at).toLocaleString('es-AR')}</span>
-                        </div>
-                        <span class="tag" style="background:${statusColor};color:white">${escapeHtml(c.status)}</span>
-                    </div>
-                    <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
-                    <div class="muted" style="margin-top:6px">
-                        ✅ ${c.actually_sent||0} enviados · ❌ ${c.actually_failed||0} fallaron · ⏳ ${c.still_pending||0} pendientes
-                    </div>
-                </div>`;
-        }).join('');
-    } catch(e){
-        $('#campaigns-list').innerHTML = '<p class="empty-state">Error: '+escapeHtml(e.message)+'</p>';
-    }
-}
+//===========================================================================
+// BOOTSTRAP
+//===========================================================================
+loadFacetsAndContacts();
+ensureTemplatesLoaded();
 
-// ============================================================
-// INIT
-// ============================================================
-function tick(){
-    $('#now').textContent = new Date().toLocaleTimeString('es-AR');
-}
-setInterval(tick, 1000);
-tick();
-loadOverview();
 </script>
 </body>
 </html>

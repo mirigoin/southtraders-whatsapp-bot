@@ -84,14 +84,14 @@ async function fetchStock() {
       const tdRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
       let td;
       while ((td = tdRe.exec(tr[1])) !== null) cells.push(td[1].replace(/<[^>]+>/g,'').trim());
-      if (cells.length >= 3 && cells[0] && cells[1]) rows.push({ desc: cells[1], qty: parseInt(cells[2])||0, transit: parseInt(cells[3])||0 });
+      if (cells.length >= 3 && cells[0] && cells[1]) rows.push({ sku: cells[0], desc: cells[1], qty: parseInt(cells[2])||0, transit: parseInt(cells[3])||0 });
     }
     if (rows.length > 0) { stockData = rows; stockLastUpdated = new Date(); console.log('Stock OK: ' + rows.length); }
   } catch(e) { console.error('Stock error:', e.message); }
 }
 
 fetchStock();
-setInterval(fetchStock, 6 * 3600 * 1000);
+setInterval(fetchStock, 5 * 60 * 1000); // refresh cada 5 minutos para mantener stock vivo
 
 function getStockSummary() {
   if (!stockData.length) return 'Stock actualizandose.';
@@ -113,27 +113,38 @@ function getStockSummary() {
 }
 
 
-// VERIFICAR STOCK EN NORTHTRADERS
+// VERIFICAR STOCK EN PANGEA (single source of truth)
+// IMPORTANT: name kept as checkNorthtraders for backwards compat with the call site,
+// but this now reads from the in-memory Pangea cache (stockData), not from Northtraders.
 async function checkNorthtraders(product) {
   try {
-    const resp = await axios.get('https://northtraders.oppen.io/report/shared?shared=fe0f1305-3a71-4b78-be99-e54e3396cbdd', {
-      timeout: 10000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    const html = resp.data;
-    // Buscar filas que contengan el producto
-    const lines = html.split('\n');
-    const matches = [];
-    const searchTerm = product.toLowerCase();
-    for (const line of lines) {
-      const clean = line.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (clean.toLowerCase().includes(searchTerm) && clean.match(/\d+/)) {
-        matches.push(clean.slice(0, 150));
-      }
+    // Ensure cache is fresh: if older than 5 min or empty, refresh now
+    const ageMs = stockLastUpdated ? (Date.now() - new Date(stockLastUpdated).getTime()) : Infinity;
+    if (!stockData.length || ageMs > 5 * 60 * 1000) {
+      await fetchStock();
     }
-    return matches.slice(0, 5).join('\n') || null;
+    if (!stockData.length) return null;
+
+    const searchTerm = product.toLowerCase().trim();
+    const matches = [];
+    for (const item of stockData) {
+      const desc = (item.desc || '').toLowerCase();
+      const sku = (item.sku || '').toLowerCase();
+      if (!desc.includes(searchTerm) && !sku.includes(searchTerm)) continue;
+      // Filter false positives for "iphone 16" matching "iphone 16 pro" or "iphone 16e"
+      if (searchTerm === 'iphone 16' && (desc.includes('iphone 16 pro') || desc.includes('iphone 16e'))) continue;
+      if (searchTerm === 'iphone 16 pro' && desc.includes('iphone 16 pro max')) continue;
+      if (searchTerm === 'iphone 17' && (desc.includes('iphone 17 pro') || desc.includes('iphone 17e'))) continue;
+      if (searchTerm === 'iphone 17 pro' && desc.includes('iphone 17 pro max')) continue;
+      if (searchTerm === 'iphone 15' && desc.includes('iphone 15 pro')) continue;
+      // Format: "SKU | DESCRIPTION | stock=N | transit=M"
+      matches.push(`${item.sku} | ${item.desc} | stock=${item.qty} | transit=${item.transit}`);
+    }
+    if (matches.length === 0) return null;
+    // Return up to 50 matches (was 5/30 before) - we have full Pangea catalog cached locally, no cost in returning all
+    return matches.slice(0, 50).join('\n');
   } catch(e) {
-    console.error('Northtraders error:', e.message);
+    console.error('checkNorthtraders error:', e.message);
     return null;
   }
 }
@@ -174,11 +185,13 @@ async function buildPrompt() {
   return 'Sos Sophia, agente comercial de South Traders, distribuidor oficial Apple en Miami.\n\n' +
     'TU ROL (CRITICO):\n' +
     '- Sos una asistente de PRE-VENTA con autoridad para informar precios y disponibilidad usando el STOCK CARGADO ABAJO. NO cerras ordenes formales (sales order). El vendedor hace eso.\n' +
-    '- El stock cargado abajo es la FUENTE DE VERDAD. Se actualiza automaticamente y refleja la disponibilidad real. Cuando el cliente pregunta "tenes X" o "cuanto cuesta Y", responde DIRECTO y con seguridad usando esos datos.\n' +
+    '- El stock cargado abajo (en bloques [DATOS DE STOCK PANGEA]) es la FUENTE DE VERDAD. Se actualiza automaticamente y refleja la disponibilidad real. Cuando el cliente pregunta "tenes X" o "cuanto cuesta Y", responde DIRECTO y con seguridad usando esos datos.\n' +
+    '- LECTURA ESTRICTA DEL STOCK: cuando recibis un bloque [DATOS DE STOCK PANGEA] tenes que leer TODAS las filas con atencion. Cada fila es un SKU distinto con su descripcion completa, su disponibilidad y stock. Si el cliente pregunta por un SKU especifico (ej: "iPhone 16 128GB Teal IND") y EXISTE una fila con ese SKU + cantidad > 0, AFIRMA que lo tenes. NUNCA digas "no lo tenemos" si la fila esta en los datos. Mira la fila completa, no solo el principio.\n' +
     '- NO digas "dame un minuto", "dejame verificar", "te confirmo en un rato", "estoy chequeando con el sistema" cuando la respuesta esta en el stock cargado. Eso te hace ver insegura y enfria al cliente. Responde directo: "Si, tenemos X unidades a USD Y por unidad" o "En este momento no tenemos disponibilidad de ese modelo, pero tenemos [alternativa]".\n' +
     '- Tu trabajo: responder con seguridad sobre productos, precios y disponibilidad usando el stock cargado, entender la intencion del cliente, armar un RESUMEN DE INTERES cuando hay cantidad concreta, y derivar al vendedor para confirmacion final del sales order.\n' +
     '- PROHIBIDO:\n' +
     '  * Decir "tenemos en [color/capacidad/region]" si NO esta en el stock cargado abajo. (Si no esta cargado, decir con seguridad: "ese modelo en este momento no lo tenemos disponible").\n' +
+    '  * Decir "no tenemos en [color/capacidad/region]" si SI esta en el stock cargado. Eso es peor que decir "no se" porque le hace perder una venta al cliente. Mira las filas COMPLETAS antes de afirmar que algo no existe.\n' +
     '  * Inventar disponibilidad o cantidades. Solo lo que esta en el stock cargado.\n' +
     '  * Confirmar una orden ("perfecto, listo, confirmado, te reservamos las unidades"). Vos NO confirmas la orden formal. El vendedor confirma con sales order al recibir el wire.\n' +
     '  * Decir "te genero el sales order". El sales order lo emite el vendedor.\n' +
@@ -210,10 +223,10 @@ async function buildPrompt() {
     '- ESTRUCTURA EXACTA de la primera respuesta a un cliente generico (en este orden):\n' +
     '  1. Saludo breve.\n' +
     '  2. Una linea diciendo que manejas: productos Apple (iPhone, MacBook, iPad, AirPods) + Samsung + accesorios.\n' +
-    '  3. Pasale el link al stock online publico para que vea precios y disponibilidad: https://south-traders.pangea.ar/n6/stock_disp\n' +
+    '  3. Pasale el link al stock online publico para que vea modelos y disponibilidad. IMPORTANTE: aclarale que el link MUESTRA disponibilidad y modelos pero NO los precios - los precios se los pasas vos directamente. Link: https://south-traders.pangea.ar/n6/stock_disp\n' +
     '  4. Inferencia de pais por prefijo del telefono ("asumo que sos de [pais] por la caracteristica" - ver tabla mas abajo).\n' +
     '  5. Pedile nombre, empresa y que producto le interesa especificamente.\n' +
-    '- Ejemplo correcto (cliente con prefijo +549): "Hola! Manejamos productos Apple (iPhone, MacBook, iPad, AirPods), Samsung y accesorios. Te paso nuestro stock online para que veas precios y disponibilidad: https://south-traders.pangea.ar/n6/stock_disp \\nAsumo que sos de Argentina por la caracteristica - como te llamas, de que empresa, y que producto te interesa?"\n' +
+    '- Ejemplo correcto (cliente con prefijo +549): "Hola! Manejamos productos Apple (iPhone, MacBook, iPad, AirPods), Samsung y accesorios. Te paso nuestro stock online para que veas modelos y disponibilidad (los precios te los paso yo directo): https://south-traders.pangea.ar/n6/stock_disp \\nAsumo que sos de Argentina por la caracteristica - como te llamas, de que empresa, y que producto te interesa?"\n' +
     '- Ejemplos INCORRECTOS:\n' +
     '  * Solo lista de bullets con productos (brochure).\n' +
     '  * Solo preguntas tipo formulario (sin info previa).\n' +
@@ -262,7 +275,7 @@ async function buildPrompt() {
     '- Mayoristas para LATAM, Caribe y el mundo.\n' +
     '- Horario: Lun-Vie 9am-5pm ET.\n' +
     '- Email: sales@south-traders.com\n' +
-    '- Stock online publico (compartilo libremente con clientes para que vean precios y disponibilidad): https://south-traders.pangea.ar/n6/stock_disp\n' +
+    '- Stock online publico (mostrar a clientes para que vean modelos y disponibilidad - aclararles que NO tiene precios, los precios los das vos directamente): https://south-traders.pangea.ar/n6/stock_disp\n' +
     '- Warehouse: en Doral, Miami. NO des la direccion completa en el chat. Si preguntan direccion exacta o quieren visitar, deciles que coordinen una cita con su vendedor asignado.\n\n' +
     'PRODUCTOS:\n' +
     '- TODOS los productos son NUEVOS, sellados, originales, directo de Apple, sin activar, factory unlocked.\n' +
@@ -310,7 +323,7 @@ async function buildPrompt() {
     '- Si arma orden por debajo: avisa el minimo y sugiere sumar unidades. No derives al vendedor por esto.\n\n' +
     'STOCK:\n' +
     '- Si preguntan por stock general o quieren ver todo: manda el link de Pangea https://south-traders.pangea.ar/n6/stock_disp#\n' +
-    '- Si preguntan PUNTUALMENTE cuantas unidades de un modelo especifico: verifica primero en Northtraders antes de responder. No inventes cantidades.\n' +
+    '- Si preguntan PUNTUALMENTE cuantas unidades de un modelo especifico: verifica primero en el stock cargado de Pangea antes de responder. No inventes cantidades.\n' +
     '- Si un modelo no esta en stock: "No lo tenemos en stock en este momento." NUNCA inventes, NUNCA digas "podemos conseguirlo" o "capaz la semana que viene", NUNCA derives a llamar solo por stock.\n' +
     '- Podes sugerir alternativas SOLO si estan efectivamente en stock. No ofrezcas Samsung si pidieron iPhone.\n\n' +
     'AUDIO:\n' +
@@ -324,7 +337,7 @@ async function buildPrompt() {
     '- Si preguntan por Xiaomi: "Xiaomi lo manejamos a pedido, no tenemos stock pero lo conseguimos. Te armamos una orden aparte. Escribile por WhatsApp al https://wa.me/5491167581084 para coordinarlo."\n\n' +
     'CUANDO NO DERIVAR (resolver vos directamente con esta info):\n' +
     '- Colores, capacidades, variantes de modelos\n' +
-    '- Stock general (link de Pangea) o stock puntual (via Northtraders)\n' +
+    '- Stock general (link de Pangea) o stock puntual (cache local de Pangea)\n' +
     '- Precios de lista\n' +
     '- Specs por region (USA/HK/JP/IND/KR/CAN/BEA)\n' +
     '- Formas de pago (wire transfer)\n' +
@@ -475,7 +488,7 @@ async function handleMessage(phone, text) {
     if (searchModel) {
       const ntData = await checkNorthtraders(searchModel);
       if (ntData) {
-        extraContext = '\n\n[DATOS DE STOCK NORTHTRADERS para "' + searchModel + '"]:\n' + ntData + '\n[Usa estos datos para responder con precision sobre disponibilidad]';
+        extraContext = '\n\n[DATOS DE STOCK PANGEA para "' + searchModel + '"]:\n' + ntData + '\n[Cada fila: SKU | DESCRIPCION | stock=disponibles | transit=en_camino. Usa estos datos como ground truth para responder. Si stock>0, AFIRMA que tenes el modelo. Si stock=0 pero transit>0, deci que en este momento no hay stock pero esta llegando.]';
       }
     }
   }

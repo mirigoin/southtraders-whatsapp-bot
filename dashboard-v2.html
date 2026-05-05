@@ -613,6 +613,9 @@
           <select id="campTemplate"><option value="">Cargando…</option></select>
         </div>
 
+        <div id="campVars" style="margin-bottom: 14px;"></div>
+        <div id="campTplPreview" style="margin-bottom: 14px; padding: 10px; background: var(--surface-2); border-radius: 6px; font-size: 12px; white-space: pre-wrap; color: var(--text-2); display: none;"></div>
+
         <div class="field-grid" style="margin-bottom: 14px;">
           <div class="field">
             <label>Filtro: Tipo</label>
@@ -705,6 +708,8 @@
             <option value="en_US">English (US)</option>
           </select>
         </label>
+        <div id="sofiaVars" style="margin-top: 10px;"></div>
+        <div id="sofiaPreview" style="margin-top: 10px; padding: 10px; background: var(--surface-2); border-radius: 5px; font-size: 12px; white-space: pre-wrap; color: var(--text-2); display: none;"></div>
       </div>
 
       <div id="modeFree" style="display:none;">
@@ -1135,18 +1140,108 @@ async function ensureTemplatesLoaded() {
   }
 }
 
+// Helper: get the template body text for a given template object
+function getTemplateBody(tpl) {
+  if (!tpl || !tpl.components) return '';
+  const body = tpl.components.find(c => (c.type || '').toUpperCase() === 'BODY');
+  return body && body.text ? body.text : '';
+}
+
+// Helper: count placeholders in a body text
+function countPlaceholders(bodyText) {
+  if (!bodyText) return 0;
+  const matches = bodyText.match(/\{\{\d+\}\}/g) || [];
+  // Get the max placeholder index
+  let max = 0;
+  matches.forEach(m => {
+    const n = parseInt(m.replace(/[^\d]/g, ''), 10);
+    if (n > max) max = n;
+  });
+  return max;
+}
+
+// Helper: replace placeholders in text with values
+function fillPlaceholders(bodyText, values) {
+  if (!bodyText) return '';
+  return bodyText.replace(/\{\{(\d+)\}\}/g, (m, idx) => {
+    const v = values[parseInt(idx, 10) - 1];
+    return v === undefined || v === '' ? m : v;
+  });
+}
+
+// Helper: get current selected template object
+function getSelectedSofiaTemplate() {
+  const sel = $('#sofiaTemplate');
+  const name = sel.value;
+  const lang = $('#sofiaLang').value;
+  if (!name) return null;
+  // Try exact match name+lang first; fall back to name only
+  let tpl = state.templates.find(t => t.name === name && t.language === lang);
+  if (!tpl) tpl = state.templates.find(t => t.name === name);
+  return tpl || null;
+}
+
+// Render variable inputs based on selected template
+function renderSofiaVars() {
+  const wrap = $('#sofiaVars');
+  const preview = $('#sofiaPreview');
+  const tpl = getSelectedSofiaTemplate();
+  if (!tpl) { wrap.innerHTML = ''; preview.style.display = 'none'; return; }
+  const body = getTemplateBody(tpl);
+  const nVars = countPlaceholders(body);
+
+  if (nVars === 0) {
+    wrap.innerHTML = '';
+    preview.textContent = body;
+    preview.style.display = body ? 'block' : 'none';
+    return;
+  }
+
+  // Get current contact for prefilling {{1}}
+  const c = state.contacts.find(x => x.phone === state.selectedPhone);
+  const defaultName = c ? (c.name || c.company || '') : '';
+
+  let html = '<div style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 4px;">Variables del template</div>';
+  for (let i = 1; i <= nVars; i++) {
+    const defaultVal = i === 1 ? defaultName : '';
+    html += `<label style="display:block; margin-top: 6px; font-size: 11px; color: var(--text-2);">{{${i}}}${i === 1 ? ' (nombre)' : ''}
+      <input type="text" class="sofia-var" data-idx="${i}" value="${esc(defaultVal)}" placeholder="${i === 1 ? 'Hola, ' + (defaultName || '...') : 'Valor para {{' + i + '}}'}" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border-2); border-radius: 5px; font-size: 12.5px; margin-top: 3px;">
+    </label>`;
+  }
+  wrap.innerHTML = html;
+
+  // Listen for input changes to update preview
+  $$('#sofiaVars input').forEach(inp => {
+    inp.oninput = updateSofiaPreview;
+  });
+  updateSofiaPreview();
+}
+
+function updateSofiaPreview() {
+  const tpl = getSelectedSofiaTemplate();
+  const preview = $('#sofiaPreview');
+  if (!tpl) { preview.style.display = 'none'; return; }
+  const body = getTemplateBody(tpl);
+  const values = $$('#sofiaVars input').map(i => i.value);
+  preview.textContent = fillPlaceholders(body, values);
+  preview.style.display = body ? 'block' : 'none';
+}
+
 function populateSofiaTemplates() {
   const sel = $('#sofiaTemplate');
   if (state.templates.length === 0) {
     sel.innerHTML = '<option>Sin templates aprobados</option>';
+    $('#sofiaVars').innerHTML = '';
+    $('#sofiaPreview').style.display = 'none';
     return;
   }
   sel.innerHTML = state.templates.map(t => `<option value="${esc(t.name)}" data-lang="${esc(t.language)}">${esc(t.name)} (${esc(t.language)})</option>`).join('');
-  // Auto-set language when template changes
   sel.onchange = () => {
     const opt = sel.options[sel.selectedIndex];
     if (opt && opt.dataset.lang) $('#sofiaLang').value = opt.dataset.lang;
+    renderSofiaVars();
   };
+  $('#sofiaLang').onchange = renderSofiaVars;
   if (sel.options[0]) { sel.selectedIndex = 0; sel.onchange(); }
 }
 
@@ -1159,7 +1254,16 @@ $('#sofiaSendBtn').onclick = async () => {
       const tpl = $('#sofiaTemplate').value;
       const lang = $('#sofiaLang').value;
       if (!tpl) { toast('Elegí un template', 'error'); $('#sofiaSendBtn').disabled = false; return; }
+      const parameters = $$('#sofiaVars input').map(i => i.value);
+      // Validate: no empty parameters
+      const emptyIdx = parameters.findIndex(p => !p || !p.trim());
+      if (emptyIdx >= 0) {
+        toast('Completá la variable {{' + (emptyIdx + 1) + '}}', 'error');
+        $('#sofiaSendBtn').disabled = false;
+        return;
+      }
       body = { mode: 'template', templateName: tpl, language: lang };
+      if (parameters.length > 0) body.parameters = parameters;
     } else {
       const text = $('#sofiaText').value.trim();
       if (!text) { toast('Escribí un mensaje', 'error'); $('#sofiaSendBtn').disabled = false; return; }
@@ -1271,6 +1375,65 @@ async function loadCampaigns() {
 //===========================================================================
 // NEW CAMPAIGN
 //===========================================================================
+// Helper: get current selected template object for the campaign tab
+function getSelectedCampTemplate() {
+  const sel = $('#campTemplate');
+  const name = sel.value;
+  if (!name) return null;
+  const opt = sel.options[sel.selectedIndex];
+  const lang = opt && opt.dataset.lang;
+  let tpl = state.templates.find(t => t.name === name && t.language === lang);
+  if (!tpl) tpl = state.templates.find(t => t.name === name);
+  return tpl || null;
+}
+
+function renderCampVars() {
+  const wrap = $('#campVars');
+  const preview = $('#campTplPreview');
+  const tpl = getSelectedCampTemplate();
+  if (!tpl) { wrap.innerHTML = ''; preview.style.display = 'none'; updateCampPreview(); return; }
+  const body = getTemplateBody(tpl);
+  const nVars = countPlaceholders(body);
+
+  if (nVars === 0) {
+    wrap.innerHTML = '';
+    preview.textContent = body;
+    preview.style.display = body ? 'block' : 'none';
+    updateCampPreview();
+    return;
+  }
+
+  let html = '<div style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 6px;">Variables del template (mismas para todos los contactos)</div>';
+  html += '<div style="font-size: 11px; color: var(--text-3); margin-bottom: 8px;">Tip: dejá <code>{nombre}</code> en una variable para que se reemplace por el nombre de cada contacto.</div>';
+  for (let i = 1; i <= nVars; i++) {
+    const placeholder = i === 1 ? '{nombre}' : 'Valor para {{' + i + '}}';
+    const defaultVal = i === 1 ? '{nombre}' : '';
+    html += `<label style="display:block; margin-top: 6px; font-size: 11px; color: var(--text-2);">{{${i}}}${i === 1 ? ' (sugerido: {nombre})' : ''}
+      <input type="text" class="camp-var" data-idx="${i}" value="${esc(defaultVal)}" placeholder="${esc(placeholder)}" style="width: 100%; padding: 7px 9px; border: 1px solid var(--border-2); border-radius: 5px; font-size: 12.5px; margin-top: 3px;">
+    </label>`;
+  }
+  wrap.innerHTML = html;
+  $$('#campVars input').forEach(inp => { inp.oninput = updateCampTplPreview; });
+  updateCampTplPreview();
+  updateCampPreview();
+}
+
+function updateCampTplPreview() {
+  const tpl = getSelectedCampTemplate();
+  const preview = $('#campTplPreview');
+  if (!tpl) { preview.style.display = 'none'; return; }
+  const body = getTemplateBody(tpl);
+  const values = $$('#campVars input').map(i => {
+    let v = i.value;
+    // Visual hint: show the substitution token verbatim in preview
+    if (v === '{nombre}' || v === '{name}') return '<NOMBRE_DEL_CONTACTO>';
+    if (v === '{empresa}' || v === '{company}') return '<EMPRESA_DEL_CONTACTO>';
+    return v;
+  });
+  preview.textContent = fillPlaceholders(body, values);
+  preview.style.display = body ? 'block' : 'none';
+}
+
 function populateNewCamp() {
   // Templates
   const tplSel = $('#campTemplate');
@@ -1295,10 +1458,12 @@ function populateNewCamp() {
   $('#campFilterEstado').innerHTML = '<option value="">Todos</option>' + estados.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
 
   // Recompute preview on changes
-  ['campTemplate', 'campFilterTipo', 'campFilterOrigen', 'campFilterRegion', 'campFilterEstado'].forEach(id => {
+  ['campFilterTipo', 'campFilterOrigen', 'campFilterRegion', 'campFilterEstado'].forEach(id => {
     $('#' + id).onchange = updateCampPreview;
   });
-  updateCampPreview();
+  // Template changes trigger var rendering
+  $('#campTemplate').onchange = renderCampVars;
+  renderCampVars();
 }
 
 function getCampFilter() {
@@ -1325,7 +1490,17 @@ function updateCampPreview() {
   const eta = Math.ceil(matched.length * 10 / 60);
   $('#campPreview').innerHTML = `Selección: <strong>${matched.length} contactos</strong>` +
     (matched.length > 0 ? ` · ETA aprox: <strong>${eta} min</strong>` : '');
-  $('#campLaunchBtn').disabled = !tpl || matched.length === 0;
+  // Validate: all variable inputs must be non-empty
+  const varInputs = $$('#campVars input');
+  const allFilled = varInputs.every(i => i.value && i.value.trim());
+  $('#campLaunchBtn').disabled = !tpl || matched.length === 0 || !allFilled;
+  // Hook variable inputs to update preview enabling
+  varInputs.forEach(i => {
+    if (!i.dataset.bound) {
+      i.dataset.bound = '1';
+      i.addEventListener('input', () => updateCampPreview());
+    }
+  });
 }
 
 $('#campLaunchBtn').onclick = async () => {
@@ -1334,6 +1509,7 @@ $('#campLaunchBtn').onclick = async () => {
   const tplOpt = $('#campTemplate').options[$('#campTemplate').selectedIndex];
   const lang = tplOpt.dataset.lang || 'es_AR';
   const filter = getCampFilter();
+  const parameters = $$('#campVars input').map(i => i.value);
 
   const matched = state.contacts.filter(c => {
     if (c.phone && c.phone.startsWith('__nophone')) return false;
@@ -1344,14 +1520,21 @@ $('#campLaunchBtn').onclick = async () => {
     if (filter.estado && c.status !== filter.estado) return false;
     return true;
   });
-  if (!confirm(`Disparar campaña "${tplName}" a ${matched.length} contactos? ETA ${Math.ceil(matched.length * 10 / 60)} min.`)) return;
+
+  let confirmMsg = `Disparar campaña "${tplName}" a ${matched.length} contactos? ETA ${Math.ceil(matched.length * 10 / 60)} min.`;
+  if (parameters.length > 0) {
+    confirmMsg += '\n\nVariables: ' + parameters.map((p, i) => `{{${i+1}}} = ${p}`).join(' · ');
+  }
+  if (!confirm(confirmMsg)) return;
 
   $('#campLaunchBtn').disabled = true;
   try {
+    const body = { templateName: tplName, language: lang, filter };
+    if (parameters.length > 0) body.parameters = parameters;
     const r = await api('/campaigns', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ templateName: tplName, language: lang, filter })
+      body: JSON.stringify(body)
     });
     toast(`Campaña iniciada: ${r.queued} mensajes encolados`, 'success');
     // Switch to campaigns tab

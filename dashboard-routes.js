@@ -342,7 +342,7 @@ module.exports = function setupDashboardRoutes(app, pool) {
             return res.status(500).json({ ok: false, error: 'PHONE_NUMBER_ID o WHATSAPP_TOKEN faltan' });
         }
 
-        const { mode = 'template', templateName, language = 'es_AR', text } = req.body || {};
+        const { mode = 'template', templateName, language = 'es_AR', text, parameters } = req.body || {};
         const targetPhone = phone.replace(/^\+/, '');
 
         try {
@@ -351,11 +351,19 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 if (!templateName) {
                     return res.status(400).json({ ok: false, error: 'templateName requerido en mode=template' });
                 }
+                const template = { name: templateName, language: { code: language } };
+                // If template has placeholders, parameters must be passed as components
+                if (Array.isArray(parameters) && parameters.length > 0) {
+                    template.components = [{
+                        type: 'body',
+                        parameters: parameters.map(p => ({ type: 'text', text: String(p == null ? '' : p) }))
+                    }];
+                }
                 payload = {
                     messaging_product: 'whatsapp',
                     to: targetPhone,
                     type: 'template',
-                    template: { name: templateName, language: { code: language } }
+                    template
                 };
             } else if (mode === 'free') {
                 if (!text) return res.status(400).json({ ok: false, error: 'text requerido en mode=free' });
@@ -379,7 +387,9 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 phone,
                 whoami(req),
                 mode === 'template' ? 'sofia_template' : 'sofia_text',
-                mode === 'template' ? `Template: ${templateName} (${language})` : `Texto: ${text.slice(0, 200)}`
+                mode === 'template'
+                    ? `Template: ${templateName} (${language})${Array.isArray(parameters) && parameters.length ? ' · params: ' + parameters.map(p => '[' + String(p).slice(0,50) + ']').join(' ') : ''}`
+                    : `Texto: ${text.slice(0, 200)}`
             );
 
             // Bump last_contact
@@ -455,7 +465,7 @@ module.exports = function setupDashboardRoutes(app, pool) {
         return 'camp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
     }
 
-    async function runCampaign(campaignId, contacts, templateName, language) {
+    async function runCampaign(campaignId, contacts, templateName, language, parametersTemplate) {
         const camp = campaigns.get(campaignId);
         const phoneId = process.env.PHONE_NUMBER_ID;
         const token = process.env.WHATSAPP_TOKEN;
@@ -468,11 +478,31 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 continue;
             }
             try {
+                const template = { name: templateName, language: { code: language } };
+                if (Array.isArray(parametersTemplate) && parametersTemplate.length > 0) {
+                    // Resolve placeholders per contact:
+                    // - Empty string or null -> use contact name/company as fallback
+                    // - Literal string "{nombre}" -> use contact name (explicit token)
+                    // - Otherwise -> use literal value (same for all contacts)
+                    const resolved = parametersTemplate.map(p => {
+                        if (p === null || p === undefined || p === '') {
+                            return c.name || c.company || 'cliente';
+                        }
+                        const s = String(p);
+                        if (s === '{nombre}' || s === '{name}') return c.name || c.company || 'cliente';
+                        if (s === '{empresa}' || s === '{company}') return c.company || c.name || 'cliente';
+                        return s;
+                    });
+                    template.components = [{
+                        type: 'body',
+                        parameters: resolved.map(v => ({ type: 'text', text: String(v) }))
+                    }];
+                }
                 await axios.post(url, {
                     messaging_product: 'whatsapp',
                     to: target,
                     type: 'template',
-                    template: { name: templateName, language: { code: language } }
+                    template
                 }, {
                     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                     timeout: 15000
@@ -493,15 +523,15 @@ module.exports = function setupDashboardRoutes(app, pool) {
     }
 
     // POST /campaigns - dispara campaña
-    // body: { templateName, language, phones: [...] | filter: {...} }
+    // body: { templateName, language, parameters: [...], phones: [...] | filter: {...} }
     app.post('/campaigns', auth, async function (req, res) {
         try {
-            const { templateName, language = 'es_AR', phones, filter } = req.body || {};
+            const { templateName, language = 'es_AR', phones, filter, parameters } = req.body || {};
             if (!templateName) return res.status(400).json({ ok: false, error: 'templateName requerido' });
 
             let contacts = [];
             if (Array.isArray(phones) && phones.length > 0) {
-                const r = await pool.query(`SELECT phone FROM crm_contacts WHERE phone = ANY($1::text[])`, [phones]);
+                const r = await pool.query(`SELECT phone, name, company FROM crm_contacts WHERE phone = ANY($1::text[])`, [phones]);
                 contacts = r.rows;
             } else if (filter && typeof filter === 'object') {
                 const where = [];
@@ -512,7 +542,7 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 if (filter.estado) { params.push(filter.estado); where.push(`status = $${params.length}`); }
                 where.push(`paused IS NOT TRUE`);
                 where.push(`phone NOT LIKE '__nophone%'`);
-                const sql = `SELECT phone FROM crm_contacts WHERE ${where.join(' AND ')}`;
+                const sql = `SELECT phone, name, company FROM crm_contacts WHERE ${where.join(' AND ')}`;
                 const r = await pool.query(sql, params);
                 contacts = r.rows;
             } else {
@@ -540,7 +570,7 @@ module.exports = function setupDashboardRoutes(app, pool) {
             campaigns.set(id, camp);
 
             // Run async
-            runCampaign(id, contacts, templateName, language).catch(e => {
+            runCampaign(id, contacts, templateName, language, parameters).catch(e => {
                 camp.status = 'errored';
                 camp.errors.push({ phone: null, error: e.message });
             });

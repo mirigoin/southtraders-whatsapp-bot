@@ -561,7 +561,10 @@ module.exports = function setupDashboardRoutes(app, pool) {
                 return res.status(400).json({ ok: false, error: 'mode invalido' });
             }
 
-            const url = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
+            // Marketing Messages API: templates de marketing van por /marketing_messages para entrega optimizada.
+            // Texto libre dentro de ventana 24h va por /messages (Service category).
+            const endpoint = mode === 'template' ? 'marketing_messages' : 'messages';
+            const url = `https://graph.facebook.com/v19.0/${phoneId}/${endpoint}`;
             const r = await axios.post(url, payload, {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 timeout: 12000
@@ -662,7 +665,9 @@ module.exports = function setupDashboardRoutes(app, pool) {
         const camp = campaigns.get(campaignId);
         const phoneId = process.env.PHONE_NUMBER_ID;
         const token = process.env.WHATSAPP_TOKEN;
-        const url = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
+        // Marketing Messages API endpoint - optimiza entrega para templates de marketing
+        // (oferta_mayorista, recuperacion_cliente, etc). Mismo phone_id, distinto path.
+        const url = `https://graph.facebook.com/v19.0/${phoneId}/marketing_messages`;
 
         for (const c of contacts) {
             const target = String(c.phone || '').replace(/^\+/, '');

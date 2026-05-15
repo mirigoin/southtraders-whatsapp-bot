@@ -782,7 +782,7 @@ app.get('/privacy', function(req, res) { res.send('<h1>Privacy Policy</h1><p>Sou
 app.get('/terms', function(req, res) { res.send('<h1>Terms of Service</h1><p>By messaging this bot you agree to receive wholesale electronics information. Contact: sales@south-traders.com</p>'); });
 
 // HEALTH
-app.get('/', function(req, res) { res.json({ status: 'ok', stock: { items: stockData.length, updated: stockLastUpdated } }); });
+app.get('/', function(req, res) { if ((req.hostname || '').startsWith('sophie.')) return res.redirect('/dashboard/v2'); res.json({ status: 'ok', stock: { items: stockData.length, updated: stockLastUpdated } }); });
 
 const PORT = process.env.PORT || 3000;
 initDB().then(function() { app.listen(PORT, function() { console.log('Sophia online port ' + PORT); }); }).catch(console.error);

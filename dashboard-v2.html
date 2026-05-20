@@ -1908,17 +1908,34 @@ async function loadConversationMessages(phone, isRefresh) {
     convState.canReplyFree = r.can_reply_free;
     convState.lastUserTs = r.last_user_ts;
     if (!isRefresh) renderConvList();  // re-render to show selection
-    renderConvMain();
+    renderConvMain(isRefresh);
   } catch (e) {
     $('#convMain').innerHTML = '<div class="conv-empty">Error: ' + esc(e.message) + '</div>';
   }
 }
 
-function renderConvMain() {
+function renderConvMain(isRefresh) {
   const c = convState.contact;
   const phone = convState.selectedPhone;
   const name = (c && (c.company || c.name)) || phone;
   const sub = c ? [c.tipo, c.region, c.origen].filter(Boolean).join(' · ') : phone;
+
+  // Snapshot scroll y composer si es un refresh (poll cada 15s)
+  let prevScroll = null, prevAtBottom = false, prevComposerVal = '', prevComposerFocused = false, prevComposerSelStart = 0, prevComposerSelEnd = 0;
+  if (isRefresh) {
+    const prevMsgs = document.getElementById('convMessages');
+    if (prevMsgs) {
+      prevScroll = prevMsgs.scrollTop;
+      prevAtBottom = (prevMsgs.scrollHeight - prevMsgs.scrollTop - prevMsgs.clientHeight) < 40;
+    }
+    const prevTa = document.getElementById('convInput');
+    if (prevTa) {
+      prevComposerVal = prevTa.value;
+      prevComposerFocused = document.activeElement === prevTa;
+      prevComposerSelStart = prevTa.selectionStart;
+      prevComposerSelEnd = prevTa.selectionEnd;
+    }
+  }
 
   // Composer area
   let composerHTML;
@@ -1976,8 +1993,12 @@ function renderConvMain() {
         </div>
       </div>`;
   }).join('');
-  // Scroll to bottom
-  msgsContainer.scrollTop = msgsContainer.scrollHeight;
+  // Scroll: en refresh, si estaba al fondo seguir al fondo, sino mantener posicion. En primer render, al fondo.
+  if (isRefresh && prevScroll !== null && !prevAtBottom) {
+    msgsContainer.scrollTop = prevScroll;
+  } else {
+    msgsContainer.scrollTop = msgsContainer.scrollHeight;
+  }
 
   // Wire up composer
   if (convState.canReplyFree) {
@@ -1993,7 +2014,18 @@ function renderConvMain() {
       }
     };
     $('#convSendBtn').onclick = sendConvReply;
-    setTimeout(() => ta.focus(), 100);
+    // Restaurar valor + foco + caret si venia de refresh
+    if (isRefresh && prevComposerVal) {
+      ta.value = prevComposerVal;
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+      if (prevComposerFocused) {
+        ta.focus();
+        try { ta.setSelectionRange(prevComposerSelStart, prevComposerSelEnd); } catch (e) {}
+      }
+    } else {
+      setTimeout(() => ta.focus(), 100);
+    }
   } else {
     const openBtn = $('#openSofiaBtn');
     if (openBtn) {
